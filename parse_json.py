@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 def values_from_datum(datum, keymatch):
 	'''
@@ -20,7 +21,7 @@ def parse_json(filename):
 	outputs dictionary, where key is tuple of shortened letter entities,
 	and value is tuple of full word entities
 	'''
-	with open('filename') as f:
+	with open(filename) as f:
 		shortened_to_full = {}
 		data = json.load(f)
 
@@ -29,4 +30,7 @@ def parse_json(filename):
 			shortened = values_from_datum(datum['entitiesShortened'], 'letter')
 			shortened_to_full[shortened] = full
 
-		return all_full, all_shortened
+		return shortened_to_full
+
+for filename in ['example_training_data.json']:
+	pprint(parse_json(filename))
