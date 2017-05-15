@@ -34,10 +34,11 @@ def keras_model():
 	"""
 	model = Sequential()
 	# Get rid of sparse characters. Null, etc. unlikely to be part of our model
-	model.add(Bidirectional(LSTM(70, input_dim=128, input_length=1, return_sequences=True)))
+	model.add(LSTM(70, input_shape=(10,128), return_sequences=True))
 	model.add(Bidirectional(LSTM(90, return_sequences=True)))
 	model.add(Bidirectional(LSTM(90, return_sequences=True)))
 	model.add(Bidirectional(LSTM(200, return_sequences=True)))
+	model.add(Bidirectional(LSTM(300, return_sequences=True)))
 	return model
 
 	
