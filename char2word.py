@@ -10,8 +10,8 @@ from keras.layers.wrappers import Bidirectional
 import spacy
 import numpy as np
 import math
-
-
+import ParseJSON
+import keras.preprocessing.sequence as sq
 def char2words(char_sequence,filename="american-english.txt"):
 	"""
 	A quick and dirty example of how to enumerate all 
@@ -36,7 +36,7 @@ def char2vec(char_sequence):
 	for c in char_sequence:
 		char_vec = [0]*129
 		char_vec[ord(c)] = 1
-		vector.append(char_vec)
+		vector.append(np.array(char_vec))
 	#vector.append([0]*128+[1])
 	return vector
 
@@ -45,7 +45,7 @@ def spacy_model():
 	"""
 	A small convenience function with a wrapper around 
 	"""
-        return spacy.load("en_core_web_md")
+	return spacy.load("en_core_web_md")
 
 def wordseq2vec(words, spacy_model):
 	"""
@@ -98,6 +98,7 @@ def test_matching_function():
 	key_strokes = "Ilef"
 	outcome = wordseq2vec(["I","love","eating","fish"],nlp)
 	return match_model_to_words(nlp, key_strokes, outcome)
+
 def test_training_proc():
 	"""
 	Unit test for the model
@@ -109,7 +110,25 @@ def test_training_proc():
 	model.fit(np.array([char2vec(key_strokes)]),np.array([vectors]), epochs=100)
 	outcome = model.predict(np.array([char2vec(key_strokes)]))
 	print(outcome)
-	return match_model_to_words(nlp, key_strokes, outcome[0])  
+	return match_model_to_words(nlp, key_strokes, outcome[0]) 
+
+def train_against_file(model, filename):
+	"""
+	Actual training code
+	TODO: split the files even smaller otherwise memory error raised
+	"""
+	my_file = ParseJSON.ParseJSON(filename)
+	nlp = spacy_model()
+	keys, labels = list(zip(*my_file.parse_json().items()))
+	char_vecs = list(map(char2vec, keys))
+	labels = list(map(lambda x: wordseq2vec(x,nlp), labels))
+	X = sq.pad_sequences(char_vecs, maxlen=100)
+	Y = sq.pad_sequences(labels, maxlen=100)
+	model.fit(X, Y, epochs=100)
+	return match_model_to_words(nlp,"Ilef",model.predict(np.array([char2vec("Ilef")]))[0])
+ 
 #print(test_matching_function())
-print(test_training_proc())
+#print(test_training_proc())
 #print(test_word2vec())
+print(train_against_file(keras_model(),"example_training_data.json"))
+#print(train_against_file(keras_model(), "/media/arjo/EXT4ISAWESOME/tmlc1-training-01/tmlc1-training-001.json"))
