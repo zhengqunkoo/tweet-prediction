@@ -1,9 +1,10 @@
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
 from keras.layers.wrappers import Bidirectional
-from gensim.models.keyedvectors import KeyedVectors
+import spacy
 import numpy as np
-def char2words(char_sequence,filename):
+import math
+def char2words(char_sequence,filename="american-english.txt"):
 	"""
 	A quick and dirty example of how to enumerate all 
         possibilities in the path
@@ -28,8 +29,19 @@ def char2vec(char_sequence):
 		char_vec = [0]*129
 		char_vec[ord(c)] = 1
 		vector.append(char_vec)
-	vector.append([0]*128+[1])
+	#vector.append([0]*128+[1])
 	return vector
+
+
+def spacy_model():
+        return spacy.load("en_core_web_md")
+
+def wordseq2vec(words, spacy_model):
+	my_vec = []
+	for word in words:
+		word_vec = spacy_model(word).vector
+		my_vec.append(word_vec)
+	return my_vec
 
 def keras_model():
 	"""
@@ -45,9 +57,35 @@ def keras_model():
 	model.compile(loss='mean_squared_error', optimizer='adam')
 	return model
 
-def test_keras_model():
-	model = keras_model()
-	model.fit(np.array([char2vec("ILEF")]),np.array([[[0]*300]*5]))
-	return model.predict(np.array([char2vec("ILEF")]))
+def match_model_to_words(spacy, keystrokes, vectors):
+	possible_words = char2words(keystrokes)
+	pred = []
+	for i in range(len(vectors)):
+		min_num = math.inf
+		min_word = ""
+		for word in possible_words[i]:
+			dist = (spacy(word).vector - vectors[i])**2
+			s = sum(dist)
+			if min_num > s:
+				min_num = s
+				min_word = word
+		pred.append(min_word)
+	return pred	
 
-print(test_keras_model())
+def test_matching_function():
+	nlp = spacy_model()
+	key_strokes = "Ilef"
+	outcome = wordseq2vec(["I","love","eating","fish"],nlp)
+	return match_model_to_words(nlp, key_strokes, outcome)
+def test_training_proc():
+	model = keras_model()
+	nlp = spacy_model()
+	key_strokes = "Ilef"
+	vectors = wordseq2vec(["I","love","eating","fish"],nlp) 
+	model.fit(np.array([char2vec(key_strokes)]),np.array([vectors]), epochs=100)
+	outcome = model.predict(np.array([char2vec(key_strokes)]))
+	print(outcome)
+	return match_model_to_words(nlp, key_strokes, outcome[0])  
+#print(test_matching_function())
+print(test_training_proc())
+#print(test_word2vec())
