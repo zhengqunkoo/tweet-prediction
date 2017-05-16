@@ -1,9 +1,17 @@
+"""
+This file houses the main model with keras it defines a few functions
+The idea is take the character vector pass it through several LSTMs and then
+get an approximate word vector. Then use nearest neighbour to find the closest
+word vector.
+"""
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
 from keras.layers.wrappers import Bidirectional
 import spacy
 import numpy as np
 import math
+
+
 def char2words(char_sequence,filename="american-english.txt"):
 	"""
 	A quick and dirty example of how to enumerate all 
@@ -34,9 +42,15 @@ def char2vec(char_sequence):
 
 
 def spacy_model():
+	"""
+	A small convenience function with a wrapper around 
+	"""
         return spacy.load("en_core_web_md")
 
 def wordseq2vec(words, spacy_model):
+	"""
+	This takes an array of words and changes it into
+	"""
 	my_vec = []
 	for word in words:
 		word_vec = spacy_model(word).vector
@@ -58,6 +72,10 @@ def keras_model():
 	return model
 
 def match_model_to_words(spacy, keystrokes, vectors):
+	"""
+	This is the nearest neighbour function that is run after the networks output. It translates
+	the vector model back into words.
+	"""
 	possible_words = char2words(keystrokes)
 	pred = []
 	for i in range(len(vectors)):
@@ -73,11 +91,17 @@ def match_model_to_words(spacy, keystrokes, vectors):
 	return pred	
 
 def test_matching_function():
+	"""
+	Test for the matching function
+	"""
 	nlp = spacy_model()
 	key_strokes = "Ilef"
 	outcome = wordseq2vec(["I","love","eating","fish"],nlp)
 	return match_model_to_words(nlp, key_strokes, outcome)
 def test_training_proc():
+	"""
+	Unit test for the model
+	"""
 	model = keras_model()
 	nlp = spacy_model()
 	key_strokes = "Ilef"
