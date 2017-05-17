@@ -3,8 +3,6 @@ import os
 
 class EntitiesFull(object):
 	'''
-	# NOTE: THIS WRITES OVER ANY EXISTING FILES WITH THE SAME NAME
-
 	writes entitiesFull from ParseJSON into txt/*.txt, where * is name of .json file
 	:para dirname: location of .json files, and no other files
 	:para encoding: format to write .txt files
@@ -27,11 +25,14 @@ class EntitiesFull(object):
 				print('{} does not exist, creating directory...'.format(txtdirname))
 
 			pj = ParseJSON(dirname + jsonname)
-			with open(txtdirname + txtname, 'w+', encoding=self.encoding) as txtfile:
-				for _, full in pj.parse_json():
-					txtfile.write(' '.join(full))
-					txtfile.write('\n')
-			print('{} written'.format(txtname))
+			if os.path.exists(txtdirname + txtname):
+				print('{} already exists'.format(txtname))
+			else:
+				with open(txtdirname + txtname, 'w+', encoding=self.encoding) as txtfile:
+					for _, full in pj.parse_json():
+						txtfile.write(' '.join(full))
+						txtfile.write('\n')
+				print('{} written'.format(txtname))
 
 	def unique_text(self):
 		'''
