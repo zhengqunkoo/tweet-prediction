@@ -122,13 +122,21 @@ def train_against_file(model, filename):
 	keys, labels = list(zip(*my_file.parse_json().items()))
 	char_vecs = list(map(char2vec, keys))
 	labels = list(map(lambda x: wordseq2vec(x,nlp), labels))
-	X = sq.pad_sequences(char_vecs, maxlen=100)
-	Y = sq.pad_sequences(labels, maxlen=100)
-	model.fit(X, Y, epochs=100)
+	for i in range(0,len(char_vecs),50):
+		if len(char_vecs) - i < 50: 
+			print("last round")
+			X = sq.pad_sequences(char_vecs[i:], maxlen=100)
+			Y = sq.pad_sequences(labels[i:], maxlen=100)
+			model.fit(X, Y, epochs=100)
+		else:
+			print("data", 100*i/(len(char_vecs))//50)
+			X = sq.pad_sequences(char_vecs[i:i+100], maxlen=100)
+			Y = sq.pad_sequences(labels[i:i+100], maxlen=100)
+			model.fit(X, Y, epochs=100)
 	return match_model_to_words(nlp,"Ilef",model.predict(np.array([char2vec("Ilef")]))[0])
  
 #print(test_matching_function())
 #print(test_training_proc())
 #print(test_word2vec())
-print(train_against_file(keras_model(),"example_training_data.json"))
-#print(train_against_file(keras_model(), "/media/arjo/EXT4ISAWESOME/tmlc1-training-01/tmlc1-training-001.json"))
+#print(train_against_file(keras_model(),"example_training_data.json"))
+print(train_against_file(keras_model(), "/media/arjo/EXT4ISAWESOME/tmlc1-training-01/tmlc1-training-001.json"))
