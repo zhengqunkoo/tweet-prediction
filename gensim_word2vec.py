@@ -3,8 +3,9 @@ import gensim, logging
 import os
 
 class Sentences(object):
-	def __init__(self, dirname, encoding='utf8'):
+	def __init__(self, dirname, filetype='.txt', encoding='utf8'):
 		self.dirname = dirname
+		self.filetype = filetype
 		self.encoding = encoding
 
 	def get_dirname(self):
@@ -15,7 +16,7 @@ class Sentences(object):
 		returns generator that converts space-separated words into list of space-separated words
 		'''
 		dirname = self.get_dirname()
-		for fname in os.listdir(dirname):
+		for fname in [f for f in os.listdir(dirname) if f.split('.')[1] == self.filetype]:
 			for line in open(os.path.join(dirname, fname), 'r', encoding=self.encoding):
 				yield line.split()
 			print('finished yielding {}'.format(fname))
@@ -26,11 +27,26 @@ if __name__ == '__main__':
 	# directories containing only training files and testing files, in .txt
 	traindir = 'train/txt/'
 	testdir = 'test/txt/'
-	sentences = Sentences(traindir)
+	# the numbers of the .txt files gensim model will be training on (purely for logging purposes)
+	start_number = '001'
+	end_number = '060'
+	# either '.txt' with duplicates, or '.unique' without duplicates
+	filetype = 'unique'
+	sentences = Sentences(traindir, filetype)
 	# :para iter: parse sentences iter times, first parse frequency count,
 	#			  then iter - 1 parses trains neural model
 	# :para min_count: discards words with frequency less than min_count
 	# :para size: size of neural network layers
 	# :para workers: number of cores working in parallel, needs Cython to work
-	model = gensim.models.Word2Vec(sentences, iter=5, min_count=5, size=200, workers=4)
-	model.save('/tmp/model-001-017-duplicates')
+
+	# min_count = 1 since need to convert all training words into vectors
+	# size = 300 since keras model requires 300 dimension vectors
+
+	itr = 5 # default 5
+	min_count = 1 # default 5
+	size = 300 # default 100
+	workers = 4 # default 1
+	model = gensim.models.Word2Vec(sentences, iter=itr, min_count=min_count, size=size, workers=workers)
+	model.save('models/model-start{}-end{}-{}-{}-{}-{}-{}'.format(start_number, end_number,
+																  itr, min_count, size, workers,
+																  filetype))

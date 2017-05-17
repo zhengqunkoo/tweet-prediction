@@ -3,7 +3,10 @@ import os
 
 class EntitiesFull(object):
 	'''
+	NOTE: does not write entitiesShortened. This class is only intended for gensim_word2vec.py
+	
 	writes entitiesFull from ParseJSON into txt/*.txt, where * is name of .json file
+
 	:para dirname: location of .json files, and no other files
 	:para encoding: format to write .txt files
 	'''
@@ -16,7 +19,8 @@ class EntitiesFull(object):
 
 	def write_text(self):
 		dirname = self.get_dirname()
-		for jsonname in os.listdir(dirname):
+		# iterate through all files, but don't iterate through directories
+		for jsonname in [f for f in os.listdir(dirname) if os.path.isfile(os.path.join(dirname, f))]:
 			txtname = jsonname.split('.')[0] + '.txt'
 			# creates txt directory inside dirname if doesn't exist
 			txtdirname = dirname + 'txt/'
@@ -28,11 +32,11 @@ class EntitiesFull(object):
 			if os.path.exists(txtdirname + txtname):
 				print('{} already exists'.format(txtname))
 			else:
-				with open(txtdirname + txtname, 'w+', encoding=self.encoding) as txtfile:
+				with open(txtdirname + txtname, 'w', encoding=self.encoding) as txtfile:
 					for _, full in pj.parse_json():
 						txtfile.write(' '.join(full))
 						txtfile.write('\n')
-				print('{} written'.format(txtname))
+				print('txt/{} written'.format(txtname))
 
 	def unique_text(self):
 		'''
@@ -40,13 +44,20 @@ class EntitiesFull(object):
 		'''
 		dirname = self.get_dirname()
 		txtdirname = dirname + 'txt/'
-		for txtname in os.listdir(txtdirname):
-			uniquelines = set(open(txtname).readlines())
-			tmp = open('unique_' + txtname, 'w').writelines(uniquelines)
-			tmp.close()
-			print('unique_{} written'.format(txtname))
+		for txtname in [f for f in os.listdir(txtdirname) if os.path.isfile(os.path.join(txtdirname, f))]:
+			# check for .txt extension
+			if txtname.split('.')[1] == 'txt':
+				# custom filetype
+				uniquename = txtname.split('.')[0] + '.unique'
+				if os.path.exists(txtdirname + uniquename):
+					print('{} already exists'.format(txtdirname + uniquename))
+				else:
+					uniquelines = set(open(txtdirname + txtname, encoding=self.encoding).readlines())
+					open(txtdirname + uniquename, 'w', encoding=self.encoding).writelines(uniquelines)
+					print('{} written'.format(txtdirname + uniquename))
 
 if __name__ == '__main__':
 	dirnames = ['train/', 'test/']
 	for dirname in dirnames:
-		ef = EntitiesFull(dirname).write_text()
+		# EntitiesFull(dirname).write_text()
+		EntitiesFull(dirname).unique_text()

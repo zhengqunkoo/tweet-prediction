@@ -39,4 +39,4 @@ class ParseJSON(object):
 if __name__ == '__main__':
 	filename = 'example_training_data.json'
 	pj = ParseJSON(filename)
-	pprint(pj.parse_json())
+	print(list(zip(*pj.parse_json())))
