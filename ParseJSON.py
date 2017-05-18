@@ -13,7 +13,7 @@ class ParseJSON(object):
 		:para datum: list of dictionaries, each dictionary has 'type' and 'value' keys
 		:para keymatch: string to match value corresponding to 'type' key in datum
 		
-		outputs tuple of concatenated values from each keymatch, in order
+		returns tuple of concatenated values from each keymatch, in order
 		'''
 		values = []
 		for entity in datum:
@@ -25,20 +25,18 @@ class ParseJSON(object):
 		'''
 		:para filename: .json filename
 
-		outputs dictionary, where key is tuple of shortened letter entities,
-		and value is tuple of full word entities
+		returns 2-tuple:
+		tuple of shortened letter entities, and
+		tuple of full word entities
 		'''
 		filename = self.get_filename()
 		with open(filename) as f:
-			shortened_to_full = {}
 			for datum in ijson.items(f, 'item'):
 				full = self.values_from_datum(datum['entitiesFull'], 'word')
 				shortened = self.values_from_datum(datum['entitiesShortened'], 'letter')
-				shortened_to_full[shortened] = full
-
-			return shortened_to_full
+				yield shortened, full
 
 if __name__ == '__main__':
-	for filename in ['example_training_data.json']:
-		pj = ParseJSON(filename)
-		pprint(pj.parse_json())
+	filename = 'example_training_data.json'
+	pj = ParseJSON(filename)
+	pprint(pj.parse_json())
