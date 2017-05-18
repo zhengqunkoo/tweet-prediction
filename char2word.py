@@ -39,7 +39,7 @@ def char2vec(char_sequence):
 		char_vec = [0]*129
 		char_vec[ord(c)] = 1
 		vector.append(np.array(char_vec))
-	#vector.append([0]*128+[1])
+	vector.append([0]*128+[1])
 	return vector
 
 
@@ -56,7 +56,9 @@ def wordseq2vec(words, spacy_model):
 	my_vec = []
 	for word in words:
 		word_vec = spacy_model(word).vector
+		word_vec = np.append(word_vec,[0,0])
 		my_vec.append(word_vec)
+	my_vec.append(np.array([0]*301+[1]))
 	return my_vec
 
 def keras_model():
@@ -68,9 +70,10 @@ def keras_model():
 	model.add(LSTM(70, input_shape=(None,129), return_sequences=True))
 	model.add(Bidirectional(LSTM(90, return_sequences=True)))
 	model.add(Bidirectional(LSTM(100, return_sequences=True)))
-	model.add(Bidirectional(LSTM(200, return_sequences=True)))
-	model.add(Bidirectional(LSTM(150, return_sequences=True)))
-	model.compile(loss='cosine_proximity', optimizer='adam')
+	model.add(Bidirectional(LSTM(120, return_sequences=True)))
+	model.add(Bidirectional(LSTM(120, return_sequences=True)))
+	model.add(Bidirectional(LSTM(151, return_sequences=True)))
+	model.compile(loss='mse', optimizer='adam')
 	return model
 
 def match_model_to_words(spacy, keystrokes, vectors):
@@ -127,7 +130,7 @@ def train_against_file(model, filename, start=0):
 	"""
 	my_file = ParseJSON.ParseJSON(filename)
 	nlp = spacy_model()
-	keys, labels = list(zip(*my_file.parse_json().items()))
+	keys, labels = list(zip(*my_file.parse_json()))
 	char_vecs = list(map(char2vec, keys))
 	labels = list(map(lambda x: wordseq2vec(x,nlp), labels))
 	tcb = cb.TensorBoard(log_dir='./logs')
@@ -138,7 +141,7 @@ def train_against_file(model, filename, start=0):
 			Y = sq.pad_sequences(labels[i:], maxlen=100)
 			model.fit(X, Y, epochs=100, callbacks=[tcb])
 		else:
-			print("data", 100*i/(len(char_vecs)/50))
+			print("data", i,len(char_vecs))
 			X = sq.pad_sequences(char_vecs[i:i+100], maxlen=100)
 			Y = sq.pad_sequences(labels[i:i+100], maxlen=100)
 			model.fit(X, Y, epochs=20,  batch_size=50, callbacks=[tcb])
