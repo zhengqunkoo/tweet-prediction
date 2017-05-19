@@ -128,7 +128,8 @@ def train_against_file(model, filename, start=0):
 	Actual training code
 	TODO: split the files even smaller otherwise memory error raised
 	"""
-	my_file = ParseJSON.ParseJSON(filename)
+	keys = [['entitiesShortened', 'value'], ['entitiesFull', 'value']]
+	my_file = ParseJSON.ParseJSON(filename, keys)
 	nlp = spacy_model()
 	keys, labels = list(zip(*my_file.parse_json()))
 	char_vecs = list(map(char2vec, keys))

@@ -73,12 +73,14 @@ class TextToCorpus(object):
 			yield dictionary.doc2bow(line.split())
 
 if __name__ == '__main__':
-	pj = ParseJSON('example_training_data.json')
-	shortened_to_full = dict(pj.parse_json())
+	filepath = 'example_training_data.json'
+	keys = [['entitiesFull', 'value']]
+	pj = ParseJSON(filepath, keys)
+	entitiesFull = pj.parse_json()
 
 	filename = 'example.txt'
 	text = TextToCorpus(filename)
-	removed_stop_and_unique = text.remove_words(shortened_to_full.values())
+	removed_stop_and_unique = text.remove_words(entitiesFull)
 	text.save_processed_texts(removed_stop_and_unique)
 	# market matrix format
 	# this serialize function probably shouldn't be in __main__, should be in TextToCorpus class
