@@ -42,7 +42,9 @@ def char2vec(char_sequence):
 
 
 def build_batch(json_file, window_size=20):
-    for _,sentence in json_file.parse_json():
+    for tweetdata in json_file.parse_json():
+        # extract sentence from tweetdata
+        sentence = tweetdata[0]
         inputs, labels =[],[]
         result = ""
         for item in sentence: result = result + " " + item
@@ -85,7 +87,9 @@ def train_model_twitter(file, model=charRNN_model()):
     This function trains the data on the character network
     :return: 
     """
-    json_file = ParseJSON.ParseJSON(file)
+    # force parse_json() to always yield this key
+    keys = [['entitiesFull', 'value']]
+    json_file = ParseJSON.ParseJSON(file, keys)
     model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=2000,
                         callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
 
