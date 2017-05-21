@@ -6,6 +6,9 @@ class ParseJSON(object):
 		'''
 		:para filepath: .json filepath, where the file is formatted as a list of JSON objects
 		:para all_keys: list of lists, each list contains full sequence of keys to extract value from dictionary
+
+		For each tweet, ParseJSON yields a list of values corresponding to all keys,
+		where each value is a list of JSON objects (type: list, dictionary, or string)
 		'''
 
 		self.filepath = filepath
