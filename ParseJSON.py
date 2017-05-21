@@ -2,41 +2,62 @@ import ijson
 from pprint import pprint
 
 class ParseJSON(object):
-	def __init__(self, filename):
-		self.filename = filename
-
-	def get_filename(self):
-		return self.filename
-
-	def values_from_datum(self, datum, keymatch):
+	def __init__(self, filepath, all_keys):
 		'''
-		:para datum: list of dictionaries, each dictionary has 'type' and 'value' keys
-		:para keymatch: string to match value corresponding to 'type' key in datum
-		
-		returns tuple of concatenated values from each keymatch, in order
+		:para filepath: .json filepath, where the file is formatted as a list of JSON objects
+		:para all_keys: list of lists, each list contains full sequence of keys to extract value from dictionary
 		'''
-		values = []
-		for entity in datum:
-			if entity['type'] == keymatch:
-				values.append(entity['value'])
-		return tuple(values)
+
+		self.filepath = filepath
+		self.all_keys = all_keys
+
+	def get_values(self, json_obj, keys):
+		'''
+		given a json_obj, which may be a dictionary, or a list of dictionaries,
+		find the value which matches sequence of dictionary keys
+		'''
+		for i in range(len(keys)):
+			if type(json_obj) == dict:
+				json_obj = json_obj[keys[i]]
+			elif type(json_obj) == list:
+				# if json_obj is a list of dictionaries, for all dictionaries in the list,
+				# match the subsequent sequence of keys (including the current key), return a list of get_values
+				return [self.get_values(new_json_obj, keys[i:]) for new_json_obj in json_obj]
+		# if json_obj was never a list, then json_obj is now the desired value. return this value
+		return json_obj
 
 	def parse_json(self):
 		'''
-		:para filename: .json filename
-
-		returns 2-tuple:
-		tuple of shortened letter entities, and
-		tuple of full word entities
+		yields list of values, where each value corresponds to each dictionary key in keys,
+		yields over all JSON objects in .json file
 		'''
-		filename = self.get_filename()
-		with open(filename) as f:
-			for datum in ijson.items(f, 'item'):
-				full = self.values_from_datum(datum['entitiesFull'], 'word')
-				shortened = self.values_from_datum(datum['entitiesShortened'], 'letter')
-				yield shortened, full
+		with open(self.filepath) as f:
+			for json_obj in ijson.items(f, 'item'):
+				# since the file is a list of json objects, each json_obj currently is a dictionary
+				yield [self.get_values(json_obj, keys) for keys in self.all_keys]
+
+	def filter_keyvaluepair_by_key(self, key):
+		'''
+		:para key: string to match key
+
+		assumes parse_json yields [[key1, key2, ...], [value1, value2, ...]]
+		only yields values with same key as :para key:
+		'''
+		for result in pj.parse_json():
+			keyvaluepair_samekey = filter(lambda x : x[0] == key, zip(*result))
+			value_samekey = map(lambda x : x[1], keyvaluepair_samekey)
+			yield list(value_samekey)
 
 if __name__ == '__main__':
-	filename = 'example_training_data.json'
-	pj = ParseJSON(filename)
-	print(list(zip(*pj.parse_json())))
+	# basic example
+	filepath = 'example_training_data.json'
+	all_keys = [['entitiesFull', 'type'], ['entitiesFull', 'value']]
+	pj = ParseJSON(filepath, all_keys)
+	pprint(list(pj.parse_json()))
+
+	print('====================================')
+
+	# manipulate
+	all_keys = [['entitiesFull', 'type'], ['entitiesFull', 'value']]
+	pj = ParseJSON(filepath, all_keys)
+	pprint(list(pj.filter_keyvaluepair_by_key('word')))
