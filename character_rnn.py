@@ -2,7 +2,7 @@ import ParseJSON
 import keras.models
 import numpy as np
 from keras.layers import GRU, Dropout, Dense
-from keras.callbacks import TensorBoard,ModelCheckpoint
+from keras.callbacks import TensorBoard, ModelCheckpoint
 from itertools import chain
 import os
 
@@ -92,17 +92,27 @@ def charRNN_model():
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
-def train_model_twitter(unique_path, batch_size, steps_per_epoch=50, epochs=10, model=charRNN_model()):
+def train_model_twitter(unique_path, batch_size, train_validate_split, steps_per_epoch=8, epochs=2, model=charRNN_model()):
     """
     This function trains the data on the character network
     :return: 
     """
+    # loop over files to fit
+    # between files, save and load weights
     for unique_file in [f for f in os.listdir(unique_path) if os.path.isfile(os.path.join(unique_path, f)) and f.split('.')[1] == 'unique']:
         with open(os.path.join(unique_path, unique_file), 'rb') as f:
             print("training on {}...".format(unique_file))
             # total lines trained per file = batch_size * steps_per_epoch * epochs
-            model.fit_generator(build_batch(f, batch_size), steps_per_epoch=steps_per_epoch, epochs=epochs,
-                                callbacks=[TensorBoard("./log"), ModelCheckpoint("hdf5/weights.{epoch:02d}.hdf5")])
+            # split batch_size into train_size and validation_size
+            train_size = int(batch_size * train_validate_split)
+            validation_size = batch_size - train_size
+            model.fit_generator(build_batch(f, train_size),
+                                steps_per_epoch=steps_per_epoch,
+                                epochs=epochs,
+                                callbacks=[TensorBoard("./log"), ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, epochs))],
+                                validation_data=build_batch(f, validation_size),
+                                validation_steps=steps_per_epoch
+                                )
 
 if __name__ == "__main__":
     unique_path = "train/txt"
@@ -112,5 +122,6 @@ if __name__ == "__main__":
     steps_per_epoch=50
     epochs=10
     """
-    batch_size = 30
-    train_model_twitter(unique_path, batch_size)
+    batch_size = 1000
+    train_model_twitter(unique_path, batch_size, 0.8, model=keras.models.load_model("hdf5/weights.tmlc1-training-005.unique.3.hdf5"))
+    print(predict(keras.models.load_model("hdf5/weights.tmlc1-training-005.unique.3.hdf5"), "hello baby", 100))
