@@ -3,6 +3,8 @@ import keras.models
 import numpy as np
 from keras.layers import GRU, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
+from itertools import chain
+import os
 
 def training_set(string, window_size=10):
     """
@@ -15,8 +17,11 @@ def training_set(string, window_size=10):
      love eati n
     love eatin g
     """
+    """
+    # this code moved to build_batch()
     if len(string) < window_size:
         yield string[:-1], string[-1]
+    """
     for i in range(len(string)-window_size):
         current_buffer = string[i:i+window_size]
         output = string[i+window_size]
@@ -25,40 +30,45 @@ def training_set(string, window_size=10):
 
 def char2vec(char_sequence):
     """
-    :param char_sequence - a sequence of characters
+    :param char_sequence: a sequence of ASCII bytes
     This function takes a char_sequence and encodes it as a series of onehot vectors
     >>> char2vec("a")
     [[....0,0,1,0,0,0,0,0,0,0,0,...]]
     """
     vector = []
+    # convert to ascii string
     for c in char_sequence:
         char_vec = [0]*128
         try:
             char_vec[ord(c)] = 1
         except IndexError:
-            pass # Not an ascii character
+            # Not an ascii character
+            raise Exception("'{}' from file {} not ASCII".format(sentence, unique_file))
         vector.append(np.array(char_vec))
     return vector
 
 
-def build_batch(json_file, window_size=20):
-    for tweetdata in json_file.parse_json():
-        # extract sentence from tweetdata
-        sentence = tweetdata[0]
-        inputs, labels =[],[]
-        result = ""
-        for item in sentence: result = result + " " + item
-        sentence = result
-        try:
+def build_batch(unique_file, batch_size, window_size=15):
+    '''
+    :param unique_file: file pointer to a .unique file
+    '''
+    while True:
+        batch_context = np.zeros((batch_size, window_size, 128))
+        batch_character = np.zeros((batch_size, 128))
+        # read :batch_size: lines from file
+        for i in range(batch_size):
+            # read line by line, strip newline
+            sentence = unique_file.readline().strip()
+            # skip sentences of length < window_size
+            # numpy cannot broadcast input array of shape 1 into shape 2
+            if len(sentence) < window_size:
+                continue
+            # else, convert to ascii format
+            sentence = str(sentence, 'ascii')
             for context, character in training_set(sentence, window_size=window_size):
-                # TODO: Optimize this shit - can use itertools.chain... and maybe move char2vec
-                # into the training set
-                #inputs.append(char2vec(context))
-                #labels.append(char2vec(character))
-                print(context,character)
-                yield (np.array([char2vec(context)]), np.array(char2vec(character)))
-        except:
-            pass
+                batch_context[i] = np.array(char2vec(context))
+                batch_character[i] = np.array(char2vec([character]))
+        yield batch_context, batch_character
 
 
 def predict(model, context, length=1):
@@ -67,6 +77,7 @@ def predict(model, context, length=1):
         mx = np.argmax(res)
         context = context+chr(mx)
     return context
+
 def charRNN_model():
     """
     This Builds a character RNN based on kaparthy's infamous blog post
@@ -81,17 +92,25 @@ def charRNN_model():
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
-
-def train_model_twitter(file, model=charRNN_model()):
+def train_model_twitter(unique_path, batch_size, steps_per_epoch=50, epochs=10, model=charRNN_model()):
     """
     This function trains the data on the character network
     :return: 
     """
-    # force parse_json() to always yield this key
-    keys = [['entitiesFull', 'value']]
-    json_file = ParseJSON.ParseJSON(file, keys)
-    model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=2000,
-                        callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
+    for unique_file in [f for f in os.listdir(unique_path) if os.path.isfile(os.path.join(unique_path, f)) and f.split('.')[1] == 'unique']:
+        with open(os.path.join(unique_path, unique_file), 'rb') as f:
+            print("training on {}...".format(unique_file))
+            # total lines trained per file = batch_size * steps_per_epoch * epochs
+            model.fit_generator(build_batch(f, batch_size), steps_per_epoch=steps_per_epoch, epochs=epochs,
+                                callbacks=[TensorBoard("./log"), ModelCheckpoint("hdf5/weights.{epoch:02d}.hdf5")])
 
 if __name__ == "__main__":
-    train_model_twitter("/media/arjo/EXT4ISAWESOME/tmlc1-training-01/tmlc1-training-001.json")
+    unique_path = "train/txt"
+    """
+    train on 15000 lines per file
+    batch_size = 30
+    steps_per_epoch=50
+    epochs=10
+    """
+    batch_size = 30
+    train_model_twitter(unique_path, batch_size)
