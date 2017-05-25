@@ -98,7 +98,6 @@ def train_model_twitter(unique_path, batch_size, train_validate_split, steps_per
     :return: 
     """
     # loop over files to fit
-    # between files, save and load weights
     for unique_file in [f for f in os.listdir(unique_path) if os.path.isfile(os.path.join(unique_path, f)) and f.split('.')[1] == 'unique']:
         with open(os.path.join(unique_path, unique_file), 'rb') as f:
             print("training on {}...".format(unique_file))
