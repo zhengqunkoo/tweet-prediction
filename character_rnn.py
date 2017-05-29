@@ -101,12 +101,11 @@ def train_model_twitter(unique_path, train_validate_split, batch_size, steps_per
                     history_callback = model.fit_generator(build_batch(f, train_size),
                                                            steps_per_epoch=steps_per_epoch,
                                                            epochs=epochs,
-                                                           callbacks=[TensorBoard("./log"),
-                                                           ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))],
+                                                           callbacks=[ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))],
                                                            validation_data=build_batch(f, validation_size),
                                                            validation_steps=steps_per_epoch
                                                            )
-                    
+
                     # log loss history in txt file, since tensorboard graph overlaps
                     loss_history = history_callback.history["loss"]
                     np_loss_history = np.array(loss_history)
