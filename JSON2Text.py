@@ -3,21 +3,17 @@ import os
 
 class JSON2Text(object):
 	"""
-	:para dirname: location of .json files, and no other files
+	:param dirname: location of .json files, and no other files
+	:param 
 	"""
 
-	def __init__(self, dirname):
+	def __init__(self, dirname, replace_types):
 		self.dirname = dirname
+		self.replace_types = replace_types
 		# keys hardcoded to be all possible keys
 		# with hardcode, can reliably edit values of keys later
 		self.keys = [['id'],['user'],['created'],['media','url'],['isReply'],['quotedText'],['entitiesFull', 'value'],['entitiesShortened', 'value']]
 		print('writing with keys: {}'.format(self.keys))
-
-	def get_dirname(self):
-		return self.dirname
-
-	def get_keys(self):
-		return self.keys
 
 	def write_text(self, rewrite=False):
 		
@@ -30,8 +26,8 @@ class JSON2Text(object):
 
 		:param rewrite: if True, rewrites existing files with same name in the same directory
 		"""
-		dirname = self.get_dirname()
-		keys = self.get_keys()
+		dirname = self.dirname
+		keys = self.keys
 
 		# for all files in txtdirname, excluding directories
 		for jsonname in [f for f in os.listdir(dirname) if os.path.isfile(os.path.join(dirname, f))]:
@@ -44,7 +40,7 @@ class JSON2Text(object):
 
 			# creates ParseJSON generator
 			jsonpath = dirname + jsonname
-			pj = ParseJSON(jsonpath, keys)
+			pj = ParseJSON(jsonpath, keys, replace_types)
 
 			txtname = jsonname.split('.')[0] + '.txt'
 			txtpath = txtdirname + txtname
@@ -126,8 +122,10 @@ class JSON2Text(object):
 
 if __name__ == '__main__':
 	dirnames = ['train/', 'test/']
+	replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
+	# set rewrite = True to rewrite all existing .txt and .unique files
 	rewrite = False
 	for dirname in dirnames:
-		j2t = JSON2Text(dirname)
+		j2t = JSON2Text(dirname, replace_types)
 		j2t.write_text(rewrite=rewrite)
-		j2t.unique_text(rewrite=rewrite, printlines=10)
+		j2t.unique_text(rewrite=rewrite, printlines=1)
