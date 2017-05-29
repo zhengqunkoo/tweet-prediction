@@ -2,16 +2,16 @@ from ParseJSON import ParseJSON
 import os
 
 class JSON2Text(object):
-	'''
-	writes the values yielded from ParseJSON into txt/*.txt, where * is name of .json file
-
+	"""
 	:para dirname: location of .json files, and no other files
-	:para keys: to be input into ParseJSON.
-	'''
-	def __init__(self, dirname, keys):
+	"""
+
+	def __init__(self, dirname):
 		self.dirname = dirname
-		self.keys = keys
-		print('writing with keys: {}'.format(keys))
+		# keys hardcoded to be all possible keys
+		# with hardcode, can reliably edit values of keys later
+		self.keys = [['id'],['user'],['created'],['media','url'],['isReply'],['quotedText'],['entitiesFull', 'value'],['entitiesShortened', 'value']]
+		print('writing with keys: {}'.format(self.keys))
 
 	def get_dirname(self):
 		return self.dirname
@@ -19,7 +19,17 @@ class JSON2Text(object):
 	def get_keys(self):
 		return self.keys
 
-	def write_text(self):
+	def write_text(self, rewrite=False):
+		
+		"""
+		writes the values yielded from ParseJSON into txt/*.txt, where * is name of .json file
+		values yielded from ParseJSON depends on self.keys
+		if a value has multiple words, the words are separated by ' '.
+		if multiple keys, values of different keys are separated by '\t'. (assumes tabs are not in tweets)
+		each tweet is separated by '\n'.
+
+		:param rewrite: if True, rewrites existing files with same name in the same directory
+		"""
 		dirname = self.get_dirname()
 		keys = self.get_keys()
 
@@ -38,21 +48,21 @@ class JSON2Text(object):
 
 			txtname = jsonname.split('.')[0] + '.txt'
 			txtpath = txtdirname + txtname
-
-			if os.path.exists(txtpath):
+			if rewrite == False and os.path.exists(txtpath):
 				print('{} already exists'.format(txtname))
 			else:
 				try:
 					with open(txtpath, 'wb') as txtfile:
 						for values in pj.parse_json():
-							# need to extract the values that we passed parse_json,
-							# since parse_json yields a list over all the keys we passed into it
-							flat = [inner for outer in values for inner in outer]
+							# delimit each value with spaces if multiple elements
+							# if value is False or None, typecast to string
+							values = [' '.join(value) if type(value) == list else str(value) for value in values]
 
-							# delimit with spaces, add newline
-							flat = ' '.join(flat) + '\n'
-							# convert to bytes to preserve unicode backslashes
-							txtfile.write(flat.encode('ascii', 'backslashreplace'))
+							# separate values by '\t', append '\n'
+							values = '\t'.join(values) + '\n'
+							values = values.encode('ascii', 'backslashreplace')
+
+							txtfile.write(values)
 
 					print('txt/{} written'.format(txtname))
 
@@ -61,12 +71,19 @@ class JSON2Text(object):
 					os.remove(txtpath)
 					print('error {}\ndeleted {}'.format(e, txtpath))
 
-	def unique_text(self):
-		'''
-		write unique liens to another file in the same directory
+	def unique_text(self, rewrite=False, printlines=0):
+		"""
+		write unique lines to .unique file in the same directory
+
+		lines are unique based only on their 'user' and 'entitiesFull' keys
+		meaning, if more than one line has the same 'user' and 'entitiesFull', the all these lines are considered duplicates
+		and only one of the lines will be included in the .unique file
+
+		:param rewrite: if True, rewrites files with same name in the same directory
+		:param printlines: prints bytes as string to show you that bytes were written correctly
 
 		calling set() on lines already shuffles the lines, no need to shuffle in model.fit_generator(), in character_rnn.py
-		'''
+		"""
 		dirname = self.get_dirname()
 		txtdirname = dirname + 'txt/'
 
@@ -81,12 +98,25 @@ class JSON2Text(object):
 				uniquepath = txtdirname + uniquename
 				txtpath = txtdirname + txtname
 
-				if os.path.exists(uniquepath):
+				if rewrite == False and os.path.exists(uniquepath):
 					print('{} already exists'.format(uniquepath))
 				else:
-					uniquelines = set(open(txtpath).readlines())
+					uniquelines = {}
+					for line in open(txtpath, 'rb'):
+						# split by tab in bytes
+						keys = line.split('\t'.encode('ascii', 'backslashreplace'))
+						# 'user' and 'entitiesFull' are hardcoded at these indeces, according to self.keys
+						user, entitiesFull = keys[1], keys[6]
+						# append newline in bytes
+						uniquelines[(user, entitiesFull)] = line + '\n'.encode('ascii', 'backslashreplace')
 					try:
-						open(uniquepath, 'wb').writelines(uniquelines)
+						with open(uniquepath, 'wb') as f:
+							printcount = 0
+							for value in uniquelines.values():
+								f.write(value)
+								if printcount < printlines:
+									print(value)
+									printcount += 1
 						print('{} written'.format(uniquepath))
 
 					except Exception as e:
@@ -96,6 +126,8 @@ class JSON2Text(object):
 
 if __name__ == '__main__':
 	dirnames = ['train/', 'test/']
+	rewrite = False
 	for dirname in dirnames:
-		JSON2Text(dirname).write_text()
-		# JSON2Text(dirname).unique_text()
+		j2t = JSON2Text(dirname)
+		j2t.write_text(rewrite=rewrite)
+		j2t.unique_text(rewrite=rewrite, printlines=10)
