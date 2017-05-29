@@ -109,7 +109,7 @@ def train_model_twitter(unique_path, train_validate_split, batch_size, steps_per
                     # log loss history in txt file, since tensorboard graph overlaps
                     loss_history = history_callback.history["loss"]
                     np_loss_history = np.array(loss_history)
-                    np.savetxt("log/loss_history.txt", np_loss_history, delimeter="\n")
+                    np.savetxt("log/loss_history.txt", np_loss_history, delimiter="\n")
         # restart from first file
         unique_number = 0
         loops += 1
