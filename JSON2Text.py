@@ -54,10 +54,15 @@ class JSON2Text(object):
 							# if value is False or None, typecast to string
 							values = [' '.join(value) if type(value) == list else str(value) for value in values]
 
-							# separate values by '\t', append '\n'
-							values = '\t'.join(values) + '\n'
-							values = values.encode('ascii', 'backslashreplace')
+							# separate values by '\t'
+							values = '\t'.join(values)
 
+							# always replace all '\n' in value with '\37'
+							# so that when filepointer.read(), doesn't cut off string midway
+							values = values.replace('\n', '\37')
+							# append '\n'
+							values = (values + '\n').encode('ascii', 'backslashreplace')
+							
 							txtfile.write(values)
 
 					print('txt/{} written'.format(txtname))
@@ -80,7 +85,7 @@ class JSON2Text(object):
 
 		calling set() on lines already shuffles the lines, no need to shuffle in model.fit_generator(), in character_rnn.py
 		"""
-		dirname = self.get_dirname()
+		dirname = self.dirname
 		txtdirname = dirname + 'txt/'
 
 		# for all files in txtdirname, excluding directories
@@ -124,7 +129,7 @@ if __name__ == '__main__':
 	dirnames = ['train/', 'test/']
 	replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
 	# set rewrite = True to rewrite all existing .txt and .unique files
-	rewrite = False
+	rewrite = True
 	for dirname in dirnames:
 		j2t = JSON2Text(dirname, replace_types)
 		j2t.write_text(rewrite=rewrite)
