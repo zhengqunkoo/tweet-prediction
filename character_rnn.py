@@ -5,6 +5,7 @@ import sys
 from keras.layers import GRU, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
 
+
 def training_set(string, window_size=10):
     """
     :param string - Takes an input string and returns a list of generators
@@ -44,7 +45,6 @@ def char2vec(char_sequence):
 
 def build_batch(json_file, window_size=20):
     # extract sentence from tweetdata
-    print("BUILD BATCH CALLED")
     for tweetdata in json_file.parse_json():
         sentence = tweetdata[0]
         print(sentence)
@@ -70,6 +70,43 @@ def predict(model, context, length=1):
         mx = np.argmax(res)
         context = context+chr(mx)
     return context
+
+
+def k_best_options(mat, k):
+    """
+    Returns the k best 
+    """
+    best = []
+    for i in range(k):
+        b = np.argmax(mat)
+        best.append((chr(b),mat[b]))
+        mat[b] = 0
+    return best
+
+
+def get_key_strokes(string):
+    return len(list(filter(lambda x: x == " ", string)))
+
+
+def beam_search(model, keystrokes, thickness =2, pruning=10, context=["a",1]):
+    """
+    Beam search: this takes a model and uses beam search as a method to find most probable
+       string. The aim is to allow for better predictions without being overly greedy.
+    """
+    stack = []
+    for current, c_prob in context:
+        if current[-1] == " ": 
+            res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
+            best = np.argmax(res)
+            predictions = [(chr(best),res[best])]
+        elif current[-1] == "\0":
+            continue
+        else:
+            res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
+            predictions = k_best_options(res,thickness)
+        for prediction, probability in predictions:
+            stack.append((current+prediction, c_prob*probability))
+    context = sorted(stack,key=lambda x: x[2])
 def charRNN_model():
     """
     This Builds a character RNN based on kaparthy's infamous blog post
@@ -94,5 +131,11 @@ def train_model_twitter(file, model=charRNN_model()):
     model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=2000,
                         callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
 
+
 if __name__ == "__main__":
-    train_model_twitter(sys.argv[1])
+    if len(sys.argv) == 1:
+        print("Usage: %s [json files]"%sys.argv[0])
+    elif len(sys.argv) == 2:
+        train_model_twitter(sys.argv[1])
+    else:
+        train_multiple_files(sys.argv[1:])
