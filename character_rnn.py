@@ -1,6 +1,7 @@
 import ParseJSON
 import keras.models
 import numpy as np
+import sys
 from keras.layers import GRU, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
 
@@ -43,13 +44,14 @@ def char2vec(char_sequence):
 
 def build_batch(json_file, window_size=20):
     # extract sentence from tweetdata
+    print("BUILD BATCH CALLED")
     for tweetdata in json_file.parse_json():
         sentence = tweetdata[0]
-
+        print(sentence)
         inputs, labels =[],[]
         result = ""
         for item in sentence: result = result + " " + item
-        sentence = result
+        sentence = result+"\0"
         try:
             for context, character in training_set(sentence, window_size=window_size):
                 # TODO: Optimize this shit - can use itertools.chain... and maybe move char2vec
@@ -74,9 +76,7 @@ def charRNN_model():
     :return: None
     """
     model = keras.models.Sequential()
-    model.add(GRU(512, input_shape=(None, 128), return_sequences=True))
-    model.add(GRU(512, return_sequences=True))
-    model.add(GRU(512))
+    model.add(GRU(512, input_shape=(None, 128)))
     model.add(Dropout(0.2))
     model.add(Dense(128, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -95,4 +95,4 @@ def train_model_twitter(file, model=charRNN_model()):
                         callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
 
 if __name__ == "__main__":
-    train_model_twitter("/media/arjo/EXT4ISAWESOME/tmlc1-training-01/tmlc1-training-001.json")
+    train_model_twitter(sys.argv[1])
