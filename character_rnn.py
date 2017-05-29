@@ -41,7 +41,7 @@ def char2vec(char_sequence, window_size):
     return vector
 
 
-def build_batch(unique_file, batch_size, window_size=15):
+def build_batch(unique_file, batch_size, window_size=25):
     '''
     :param unique_file: file pointer to a .unique file
     '''
@@ -54,16 +54,17 @@ def build_batch(unique_file, batch_size, window_size=15):
             sentence = unique_file.readline().strip()
             # else, convert to ascii format
             sentence = str(sentence, 'ascii')
-            for context, character in training_set(sentence, window_size):
-                batch_context[i] = np.array(char2vec(context, window_size))
-                # window_size 1 because length char == 1
-                batch_character[i] = np.array(char2vec([character], window_size=1))
+            if sentence:
+                for context, character in training_set(sentence, window_size):
+                    batch_context[i] = np.array(char2vec(context, window_size))
+                    # window_size 1 because length char == 1
+                    batch_character[i] = np.array(char2vec([character], window_size=1))
         yield batch_context, batch_character
 
 
-def predict(model, context, length=1):
+def predict(model, context, window_size=25, length=1):
     for i in range(length):
-        res = model.predict(np.array([char2vec(context)]))
+        res = model.predict(np.array([char2vec(context, window_size)]))
         mx = np.argmax(res)
         context = context+chr(mx)
     return context
@@ -82,7 +83,7 @@ def charRNN_model():
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
-def train_model_twitter(unique_path, batch_size, train_validate_split, loops=0, unique_number=None, steps_per_epoch=80, epochs=1, model=charRNN_model()):
+def train_model_twitter(unique_path, train_validate_split, batch_size, steps_per_epoch, epochs, loops=0, unique_number=None, model=charRNN_model()):
     """
     This function trains the data on the character network
     :return: 
@@ -97,28 +98,36 @@ def train_model_twitter(unique_path, batch_size, train_validate_split, loops=0, 
                     # split batch_size into train_size and validation_size
                     train_size = int(batch_size * train_validate_split)
                     validation_size = batch_size - train_size
-                    model.fit_generator(build_batch(f, train_size),
-                                        steps_per_epoch=steps_per_epoch,
-                                        epochs=epochs,
-                                        callbacks=[TensorBoard("./log"), ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))],
-                                        validation_data=build_batch(f, validation_size),
-                                        validation_steps=steps_per_epoch
-                                        )
+                    history_callback = model.fit_generator(build_batch(f, train_size),
+                                                           steps_per_epoch=steps_per_epoch,
+                                                           epochs=epochs,
+                                                           callbacks=[TensorBoard("./log"),
+                                                           ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))],
+                                                           validation_data=build_batch(f, validation_size),
+                                                           validation_steps=steps_per_epoch
+                                                           )
+                    
+                    # log loss history in txt file, since tensorboard graph overlaps
+                    loss_history = history_callback.history["loss"]
+                    np_loss_history = np.array(loss_history)
+                    np.savetxt("log/loss_history.txt", np_loss_history, delimeter="\n")
         # restart from first file
         unique_number = 0
         loops += 1
 
 if __name__ == "__main__":
     unique_path = "train/txt"
-    unique_number = 39 # continue training for files strictly after this number
-    loops = 3 # how many times trained over entire fileset
-    hdf5_file = "hdf5/weights.tmlc1-training-0{}.unique.{}.hdf5".format(unique_number, loops)
+    unique_number = 38 # continue training for files strictly after this number
+    unique_str = str(unique_number)
+    unique_str = "0"*(2 - len(unique_str)) + unique_str
+    loops = 102 # how many times trained over entire fileset
+    hdf5_file = "hdf5/weights.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
     """
     train on 16000 lines per file
-    batch_size = 200
-    steps_per_epoch = 8
-    epochs = 1
     """
-    batch_size = 200
-    train_model_twitter(unique_path, batch_size, 0.8, loops=loops, unique_number=unique_number, model=keras.models.load_model(hdf5_file))
+    batch_size = 50
+    steps_per_epoch = 40
+    epochs = 8
     print(predict(keras.models.load_model(hdf5_file), "hello baby", 100))
+    train_model_twitter(unique_path, 0.9, batch_size, steps_per_epoch, epochs,
+        loops=loops, unique_number=unique_number, model=keras.models.load_model(hdf5_file))
