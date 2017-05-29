@@ -109,7 +109,7 @@ class JSON2Text(object):
 						# 'user' and 'entitiesFull' are hardcoded at these indeces, according to self.keys
 						user, entitiesFull = keys[1], keys[6]
 						# append newline in bytes
-						uniquelines[(user, entitiesFull)] = line + '\n'.encode('ascii', 'backslashreplace')
+						uniquelines[(user, entitiesFull)] = line
 					try:
 						with open(uniquepath, 'wb') as f:
 							printcount = 0
@@ -132,5 +132,5 @@ if __name__ == '__main__':
 	rewrite = True
 	for dirname in dirnames:
 		j2t = JSON2Text(dirname, replace_types)
-		j2t.write_text(rewrite=rewrite)
+		#j2t.write_text(rewrite=rewrite)
 		j2t.unique_text(rewrite=rewrite, printlines=1)
