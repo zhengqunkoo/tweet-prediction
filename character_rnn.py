@@ -109,14 +109,15 @@ def train_model_twitter(unique_path, train_validate_split, batch_size, steps_per
                     # log loss history in txt file, since tensorboard graph overlaps
                     loss_history = history_callback.history["loss"]
                     np_loss_history = np.array(loss_history)
-                    np.savetxt("log/loss_history.txt", np_loss_history, delimiter="\n")
+                    with open("log/loss_history.txt", 'ab') as f:
+                        np.savetxt(f, np_loss_history, delimiter="\n")
         # restart from first file
         unique_number = 0
         loops += 1
 
 if __name__ == "__main__":
     unique_path = "train/txt"
-    unique_number = 38 # continue training for files strictly after this number
+    unique_number = 55 # continue training for files strictly after this number
     unique_str = str(unique_number)
     unique_str = "0"*(2 - len(unique_str)) + unique_str
     loops = 102 # how many times trained over entire fileset
@@ -125,8 +126,8 @@ if __name__ == "__main__":
     train on 16000 lines per file
     """
     batch_size = 50
-    steps_per_epoch = 40
-    epochs = 8
+    steps_per_epoch = 80
+    epochs = 4
     print(predict(keras.models.load_model(hdf5_file), "hello baby", 100))
     train_model_twitter(unique_path, 0.9, batch_size, steps_per_epoch, epochs,
         loops=loops, unique_number=unique_number, model=keras.models.load_model(hdf5_file))
