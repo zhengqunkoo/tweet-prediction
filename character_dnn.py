@@ -155,7 +155,7 @@ def charDNN_model(ch2ix):
     x = Dense(280, dtype='float32', activation='softmax')(x)
     x = Dropout(0.2)(x)
     
-    main_output = Dense(101, dtype='int32', activation='softmax', name='main_output')(x)
+    main_output = Dense(input_length, dtype='int32', activation='softmax', name='main_output')(x)
 
     model = Model(inputs=[created_branch,
                           media_branch,
@@ -247,5 +247,5 @@ if __name__ == "__main__":
                         batch_size,
                         epochs,
                         loops=loops,
-                        unique_number=unique_number,
-                        model=load_model(hdf5_file))
+                        unique_number=unique_number)
+                        #model=load_model(hdf5_file))
