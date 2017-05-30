@@ -51,12 +51,8 @@ class ParseJSON(object):
 						text = re.sub(r'\s?@\S*\s', ' ', text)
 						text = re.sub(r'#\S*\s', ' ', text)
 						text = re.sub(r'http\S*', ' ', text)
-						myre = re.compile(u'('
-										  u'\ud83c[\udf00-\udfff]|'
-										  u'\ud83d[\udc00-\ude4f\ude80-\udeff]|'
-										  u'[\u2600-\u26FF\u2700-\u27BF])+', 
-										  re.UNICODE)
-						text = myre.sub(r'', text)
+						#  replace all non-ASCII characters with ' '
+						text = re.sub(r'[^\x00-\x7F]', ' ', text)
 						# strip trailing spaces
 						return text.strip(' ')
 					return 0
