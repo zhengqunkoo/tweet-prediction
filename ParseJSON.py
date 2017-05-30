@@ -7,6 +7,7 @@ class ParseJSON(object):
 		"""
 		:param filepath: .json filepath, where the file is formatted as a list of JSON objects
 		:param all_keys: list of lists, each list contains full sequence of keys to extract value from dictionary
+		:param replace_types: map of JSON data types into special characters
 
 		For each tweet, ParseJSON yields a list of values corresponding to all keys,
 		where each value is a list of JSON objects (type: list, dictionary, or string)
@@ -28,15 +29,33 @@ class ParseJSON(object):
 
 		for i in range(len(keys)):
 			if type(json_obj) == dict:
+				# preprocessing
+				# return 1 or 0 for media and isReply
+				# return quotedText or 0 for quotedText
+				# convert created YYYY-MM-DD HH:MM:SS to YYYYMMDDHHMMSS
+				if keys[i] == 'media':
+					if json_obj['media']:
+						return 1
+					return 0
+				elif keys[i] == 'isReply':
+					if json_obj['isReply']:
+						return 1
+					return 0
+				elif keys[i] == 'quotedText':
+					if json_obj['quotedText']:
+						return json_obj['quotedText']
+					return 0
+				elif keys[i] == 'created':
+					return sub('[^0-9]', '', json_obj['created'])
 
 				# filter words from entitiesFull
 				# such that entitiesFull does not contain any other type other than 'word'
 				# assumes entitiesFull is the only key that contains the type 'word'
 				# (e.g. entitiesShortened does not contain the type 'word')
-				if keys[i] == 'entitiesFull':
+				elif keys[i] == 'entitiesFull':
 					return [d['value'] for d in json_obj['entitiesFull'] if d['type'] == 'word']
 
-				if 'type' in json_obj:
+				elif 'type' in json_obj:
 					json_type = json_obj['type']
 					if json_type in replace_types:
 						# instead of returning actual value, return a placeholder, a special ASCII char
@@ -77,7 +96,7 @@ class ParseJSON(object):
 if __name__ == '__main__':
 	# example 1
 	filepath = 'train/tmlc1-training-010.json'
-	all_keys = [['id'],['user'],['created'],['media','url'],['isReply'],['quotedText'],['entitiesFull', 'value'],['entitiesShortened', 'value']]
+	all_keys = [['id'],['user'],['created'],['media'],['isReply'],['quotedText'],['entitiesFull', 'value'],['entitiesShortened', 'value']]
 	replace_types = {'hashtag':'\31', 'userMention':'\32', 'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
 
 	filepath = 'example_training_data.json'
