@@ -1,7 +1,7 @@
 import ParseJSON
 import numpy as np
 import os
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Dense, Dropout, Input, concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import TensorBoard, ModelCheckpoint
@@ -168,13 +168,14 @@ def charDNN_model(ch2ix):
     return model
 
 
-def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_number=None):
+def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_number=None, model=None):
     """
     This function trains the data on the character network
     :return: 
     """
+    if model == None:
+        model = charDNN_model(ch2ix)
     # loop over files to fit
-    model = charDNN_model(ch2ix)
     while True:
         for unique_file in [f for f in os.listdir(unique_path) if os.path.isfile(os.path.join(unique_path, f)) and f.split('.')[1] == 'unique']:
             if not unique_number or int(unique_file.split('.')[0][-3:]) > unique_number:
@@ -230,7 +231,7 @@ if __name__ == "__main__":
     
     # parameters to continue training
     unique_path = "train/txt"
-    unique_number = 0 # continue training for files strictly after this number
+    unique_number = 23 # continue training for files strictly after this number
     unique_str = str(unique_number)
     unique_str = "0"*(2 - len(unique_str)) + unique_str
     loops = 0 # how many times trained over entire fileset
@@ -246,5 +247,5 @@ if __name__ == "__main__":
                         batch_size,
                         epochs,
                         loops=loops,
-                        unique_number=unique_number
-                        )# , model=keras.models.load_model(hdf5_file))
+                        unique_number=unique_number,
+                        model=load_model(hdf5_file))
