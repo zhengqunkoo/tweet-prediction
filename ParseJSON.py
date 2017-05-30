@@ -29,9 +29,17 @@ class ParseJSON(object):
 		for i in range(len(keys)):
 			if type(json_obj) == dict:
 
+				# filter words from entitiesFull
+				# such that entitiesFull does not contain any other type other than 'word'
+				# assumes entitiesFull is the only key that contains the type 'word'
+				# (e.g. entitiesShortened does not contain the type 'word')
+				if keys[i] == 'entitiesFull':
+					return [d['value'] for d in json_obj['entitiesFull'] if d['type'] == 'word']
+
 				if 'type' in json_obj:
 					json_type = json_obj['type']
 					if json_type in replace_types:
+						# instead of returning actual value, return a placeholder, a special ASCII char
 						return replace_types[json_type]
 
 				json_obj = json_obj[keys[i]]
@@ -67,10 +75,23 @@ class ParseJSON(object):
 			yield list(value_samekey)
 
 if __name__ == '__main__':
-	# basic example
+	# example 1
 	filepath = 'train/tmlc1-training-010.json'
 	all_keys = [['id'],['user'],['created'],['media','url'],['isReply'],['quotedText'],['entitiesFull', 'value'],['entitiesShortened', 'value']]
 	replace_types = {'hashtag':'\31', 'userMention':'\32', 'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
+
+	filepath = 'example_training_data.json'
+	all_keys = [['entitiesFull', 'value'], ['entitiesShortened', 'value']]
+	pj = ParseJSON(filepath, all_keys, replace_types)
+	for i in pj.parse_json():
+		for j in i:
+			pprint(j)
+	# manipulate
+	# pprint(list(pj.filter_keyvaluepair_by_key('word')))
+
+	"""
+	print('====================================')
+	# example 2
 	pj = ParseJSON(filepath, all_keys, replace_types)
 	for values in pj.parse_json():
 		values = [' '.join(value) if type(value) == list else str(value) for value in values]
@@ -81,11 +102,4 @@ if __name__ == '__main__':
 		if '\n' in values:
 			values = values.replace('\n', '\37')
 			values = values.encode('ascii', 'backslashreplace')
-
-	print('====================================')
-
-	# manipulate
-	filepath = 'example_training_data.json'
-	all_keys = [['entitiesFull', 'type'], ['entitiesFull', 'value']]
-	pj = ParseJSON(filepath, all_keys, replace_types)
-	pprint(list(pj.filter_keyvaluepair_by_key('word')))
+	"""
