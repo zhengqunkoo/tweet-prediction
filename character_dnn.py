@@ -54,7 +54,7 @@ def build_batch(f, batch_size, ch2ix):
     num2ix = {str(ix):ix for ix in range(10)}
     bin2ix = {str(ix):ix for ix in range(2)}
 
-    # assume tweets are 140 characters long
+    # assume tweets are TWEETSIZE characters long
     batch_train = []
     batch_test = []
     # read :batch_size: lines from file
@@ -81,12 +81,12 @@ def build_batch(f, batch_size, ch2ix):
         
         data = [created, media, reply, quote, entities_shortened]
         try:
-            data = [np.vstack((x, np.zeros((140-x.shape[0], x.shape[1])))) for x in data]
+            data = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in data]
         except Exception as e:
             print(str(e))
             print([x.shape for x in data])
         batch_train.append(data)
-        batch_test.append(np.vstack((entities_full, np.zeros((140-entities_full.shape[0], entities_full.shape[1])))))
+        batch_test.append(np.vstack((entities_full, np.zeros((TWEETSIZE-entities_full.shape[0], entities_full.shape[1])))))
 
     return batch_train, np.array(batch_test)
 
@@ -142,16 +142,18 @@ def charDNN_model(ch2ix):
     """
     input_length = len(ch2ix)
 
-    created_branch = Input(shape=(140, 10), dtype='float32', name='created_branch')
-    media_branch = Input(shape=(140, 2), dtype='float32', name='media_branch')
-    reply_branch = Input(shape=(140, 2), dtype='float32', name='reply_branch')
-    quote_branch = Input(shape=(140, input_length), dtype='float32', name='quote_branch')
-    entities_shortened_branch = Input(shape=(140, input_length), dtype='float32', name='entities_shortened_branch')
+    created_branch = Input(shape=(TWEETSIZE, 10), dtype='float32', name='created_branch')
+    media_branch = Input(shape=(TWEETSIZE, 2), dtype='float32', name='media_branch')
+    reply_branch = Input(shape=(TWEETSIZE, 2), dtype='float32', name='reply_branch')
+    quote_branch = Input(shape=(TWEETSIZE, input_length), dtype='float32', name='quote_branch')
+    entities_shortened_branch = Input(shape=(TWEETSIZE, input_length), dtype='float32', name='entities_shortened_branch')
 
     x = concatenate([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], axis=2)
     x = Dense(280, dtype='float32', activation='softmax')(x)
     x = Dense(280, dtype='float32', activation='softmax')(x)
-    x = Dropout(0.1)(x)
+    x = Dense(280, dtype='float32', activation='softmax')(x)
+    x = Dense(280, dtype='float32', activation='softmax')(x)
+    x = Dropout(0.2)(x)
     
     main_output = Dense(101, dtype='int32', activation='softmax', name='main_output')(x)
 
@@ -206,6 +208,8 @@ def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_
 
 if __name__ == "__main__":
     NULLBYTE = '\0'
+    NEWLINE = '\37'
+    TWEETSIZE = 160
     # assume replace_types identical to replace_types in JSON2Text
     # if replace_types different, wrong prediction
 
@@ -218,10 +222,8 @@ if __name__ == "__main__":
     # then enumeration index changes, and old model will not be compatible with new model
 
     replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
-    # ASCII non-special chars from byte 32 to byte 127 will definitely be included
-    # ASCII special chars are just NULLBYTE and replace_types
     ascii_nonspec_chars = [chr(x) for x in range(32, 128)]
-    ascii_spec_chars = [NULLBYTE] + list(replace_types.values())
+    ascii_spec_chars = [NULLBYTE, NEWLINE] + list(replace_types.values())
     chars = ascii_nonspec_chars + ascii_spec_chars
 
     ch2ix, _ = get_ch2ix_ix2ch(chars)
@@ -231,13 +233,13 @@ if __name__ == "__main__":
     unique_number = 0 # continue training for files strictly after this number
     unique_str = str(unique_number)
     unique_str = "0"*(2 - len(unique_str)) + unique_str
-    loops = 200 # how many times trained over entire fileset
+    loops = 0 # how many times trained over entire fileset
     hdf5_file = "hdf5/weights.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
     """
-    train on 16000 lines per file
+    train on 17000 lines per file
     """
-    batch_size = 200
-    epochs = 80
+    batch_size = 100
+    epochs = 170
     # print(predict(keras.models.load_model(hdf5_file), "hello baby", 100))
     train_model_twitter(ch2ix,
                         unique_path,

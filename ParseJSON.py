@@ -1,6 +1,6 @@
 import ijson
 from pprint import pprint
-from re import sub
+import re
 
 class ParseJSON(object):
 	def __init__(self, filepath, all_keys, replace_types):
@@ -43,10 +43,25 @@ class ParseJSON(object):
 					return 0
 				elif keys[i] == 'quotedText':
 					if json_obj['quotedText']:
-						return json_obj['quotedText']
+						# quotedText is unlabelled string
+						# use regex to remove all userMentions, hashtags, urls, emojis from quotedText
+						# TODO ##############################################################
+						# need replace with whitespace? or can replace with nothing??
+						text = json_obj['quotedText']
+						text = re.sub(r'\s?@\S*\s', ' ', text)
+						text = re.sub(r'#\S*\s', ' ', text)
+						text = re.sub(r'http\S*', ' ', text)
+						myre = re.compile(u'('
+										  u'\ud83c[\udf00-\udfff]|'
+										  u'\ud83d[\udc00-\ude4f\ude80-\udeff]|'
+										  u'[\u2600-\u26FF\u2700-\u27BF])+', 
+										  re.UNICODE)
+						text = myre.sub(r'', text)
+						# strip trailing spaces
+						return text.strip(' ')
 					return 0
 				elif keys[i] == 'created':
-					return sub('[^0-9]', '', json_obj['created'])
+					return re.sub('[^0-9]', '', json_obj['created'])
 
 				# filter words from entitiesFull
 				# such that entitiesFull does not contain any other type other than 'word'
@@ -100,7 +115,8 @@ if __name__ == '__main__':
 	replace_types = {'hashtag':'\31', 'userMention':'\32', 'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
 
 	filepath = 'example_training_data.json'
-	all_keys = [['entitiesFull', 'value'], ['entitiesShortened', 'value']]
+	# all_keys = [['entitiesFull', 'value'], ['entitiesShortened', 'value']]
+	all_keys = [['quotedText']]
 	pj = ParseJSON(filepath, all_keys, replace_types)
 	for i in pj.parse_json():
 		for j in i:
