@@ -53,7 +53,7 @@ class JSON2Text(object):
 							# delimit each value with spaces if multiple elements
 							# if value is False or None, typecast to string
 							values = [' '.join(value) if type(value) == list else str(value) for value in values]
-
+							# append nullbyte to entitiesFull
 							# separate values by '\t'
 							values = '\t'.join(values)
 
@@ -127,10 +127,11 @@ class JSON2Text(object):
 
 if __name__ == '__main__':
 	dirnames = ['train/', 'test/']
+	# hashtag, userMention are not replaced
 	replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
 	# set rewrite = True to rewrite all existing .txt and .unique files
 	rewrite = True
 	for dirname in dirnames:
 		j2t = JSON2Text(dirname, replace_types)
-		#j2t.write_text(rewrite=rewrite)
+		j2t.write_text(rewrite=rewrite)
 		j2t.unique_text(rewrite=rewrite, printlines=1)
