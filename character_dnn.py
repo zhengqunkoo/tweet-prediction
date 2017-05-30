@@ -1,15 +1,11 @@
 import ParseJSON
 import numpy as np
 import os
-from keras.models import Sequential
-from keras.layers import Dense, Merge, Dropout
+from keras.models import Model
+from keras.layers import Dense, Dropout, Input, concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import TensorBoard, ModelCheckpoint
-
-"""
-merge multiple neural networks
-https://statcompute.wordpress.com/2017/01/08/an-example-of-merge-layer-in-keras/
-"""
+from pprint import pprint
 
 def get_ch2ix_ix2ch(chars):
     """
@@ -59,8 +55,8 @@ def build_batch(f, batch_size, ch2ix):
     bin2ix = {str(ix):ix for ix in range(2)}
 
     # assume tweets are 140 characters long
-    batch_training = np.zeros((batch_size, 5, 140))
-    batch_test = np.zeros((batch_size, 140))
+    batch_train = []
+    batch_test = []
     # read :batch_size: lines from file
     # if reach EOF before batch_size read, just return the np.arrays with extra zeros at the end
     for i in range(batch_size):
@@ -75,17 +71,24 @@ def build_batch(f, batch_size, ch2ix):
         # then pad zeros to all shorter twitter usernames
 
         # the values below have fixed lengths for all users
+        # quote is either 0 or full quote
         created = char2vec(created, num2ix)
         media = char2vec(media, bin2ix)
         reply = char2vec(reply, bin2ix)
-        quote = char2vec(quote, bin2ix)
+        quote = char2vec(quote, ch2ix)
         entities_shortened = char2vec(entities_shortened, ch2ix)
         entities_full = char2vec(entities_full, ch2ix)
         
-        batch_training[i] = np.array([created, media, reply, quote, entities_shortened])
-        batch_test[i] = entities_full
+        data = [created, media, reply, quote, entities_shortened]
+        try:
+            data = [np.vstack((x, np.zeros((140-x.shape[0], x.shape[1])))) for x in data]
+        except Exception as e:
+            print(str(e))
+            print([x.shape for x in data])
+        batch_train.append(data)
+        batch_test.append(np.vstack((entities_full, np.zeros((140-entities_full.shape[0], entities_full.shape[1])))))
 
-    yield batch_training, batch_test
+    return batch_train, np.array(batch_test)
 
 def predict(model, context, length=1):
     for i in range(length):
@@ -131,66 +134,69 @@ def beam_search(model, keystrokes, thickness =2, pruning=10, context=["a",1]):
             stack.append((current+prediction, c_prob*probability))
     context = sorted(stack,key=lambda x: x[2])
 
-def charDNN_model():
+def charDNN_model(ch2ix):
     """
-    This Builds a character RNN based on kaparthy's infamous blog post
+    functional API
+    https://keras.io/getting-started/functional-api-guide/#multi-input-and-multi-output-models
     :return: None
     """
-    created_branch = Sequential()
-    media_branch = Sequential()
-    reply_branch = Sequential()
-    quote_branch = Sequential()
-    entities_shortened_branch = Sequential()
+    input_length = len(ch2ix)
 
-    created_branch.add(Dense(16, input_shape=(16,), activation='softmax'))
-    media_branch.add(Dense(2, input_shape=(2,), activation='relu'))
-    reply_branch.add(Dense(2, input_shape=(2,), activation='relu'))
-    quote_branch.add(Dense(140, input_shape=(140,), activation='softmax'))
-    entities_shortened_branch.add(Dense(140, input_shape=(140,), activation='softmax'))
+    created_branch = Input(shape=(140, 10), dtype='float32', name='created_branch')
+    media_branch = Input(shape=(140, 2), dtype='float32', name='media_branch')
+    reply_branch = Input(shape=(140, 2), dtype='float32', name='reply_branch')
+    quote_branch = Input(shape=(140, input_length), dtype='float32', name='quote_branch')
+    entities_shortened_branch = Input(shape=(140, input_length), dtype='float32', name='entities_shortened_branch')
 
-    created_branch.add(BatchNormalization())
-    media_branch.add(BatchNormalization())
-    reply_branch.add(BatchNormalization())
-    quote_branch.add(BatchNormalization())
-    entities_shortened_branch.add(BatchNormalization())
+    x = concatenate([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], axis=2)
+    x = Dense(280, dtype='float32', activation='softmax')(x)
+    x = Dense(280, dtype='float32', activation='softmax')(x)
+    x = Dropout(0.1)(x)
+    
+    main_output = Dense(101, dtype='int32', activation='softmax', name='main_output')(x)
 
-    model = Sequential()
-    model.add(Merge([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], mode='concat'))
-    model.add(Dense(280, activation='softmax'))
-    model.add(Dense(280, activation='softmax'))
-    model.add(Dropout(0.2))
-    model.add(Dense(140, activation='softmax'))
+    model = Model(inputs=[created_branch,
+                          media_branch,
+                          reply_branch,
+                          quote_branch,
+                          entities_shortened_branch
+                          ],
+                  outputs=[main_output])
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
 
-def train_model_twitter(ch2ix, unique_path, train_validate_split, batch_size, steps_per_epoch, epochs, loops=0, unique_number=None, model=charDNN_model()):
+def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_number=None):
     """
     This function trains the data on the character network
     :return: 
     """
     # loop over files to fit
+    model = charDNN_model(ch2ix)
     while True:
         for unique_file in [f for f in os.listdir(unique_path) if os.path.isfile(os.path.join(unique_path, f)) and f.split('.')[1] == 'unique']:
             if not unique_number or int(unique_file.split('.')[0][-3:]) > unique_number:
                 with open(os.path.join(unique_path, unique_file), 'rb') as f:
                     print("training on {}...".format(unique_file))
-                    # total lines trained per file = batch_size * steps_per_epoch * epochs
-                    # split batch_size into train_size and validation_size
-                    train_size = int(batch_size * train_validate_split)
-                    validation_size = batch_size - train_size
-                    history_callback = model.fit_generator(build_batch(f, train_size, ch2ix),
-                                                           steps_per_epoch=steps_per_epoch,
-                                                           epochs=epochs,
-                                                           callbacks=[ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))],
-                                                           validation_data=build_batch(f, validation_size, ch2ix),
-                                                           validation_steps=steps_per_epoch
-                                                           )
+
+                    input_data, entities_full_data = build_batch(f, batch_size, ch2ix)
+                    created_data, media_data, reply_data, quote_data, entities_shortened_data = map(lambda x : np.asarray(x), zip(*input_data))
+                    history_callback = model.fit({'created_branch':created_data,
+                                                  'media_branch':media_data,
+                                                  'reply_branch':reply_data,
+                                                  'quote_branch':quote_data,
+                                                  'entities_shortened_branch':entities_shortened_data
+                                                 },
+                                                 {'main_output':entities_full_data},
+                                                 epochs=epochs,
+                                                 batch_size=batch_size,
+                                                 callbacks=[ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))]
+                                                 )
 
                     # log loss history in txt file, since tensorboard graph overlaps
                     loss_history = history_callback.history["loss"]
                     np_loss_history = np.array(loss_history)
-                    with open("log/loss_history.txt", 'ab') as f:
+                    with open("log/dnn_loss-batch{}-epoch{}.txt".format(batch_size, epochs), 'ab') as f:
                         np.savetxt(f, np_loss_history, delimiter="\n")
         # restart from first file
         unique_number = 0
@@ -230,16 +236,12 @@ if __name__ == "__main__":
     """
     train on 16000 lines per file
     """
-    train_validate_split = 0.9
-    batch_size = 50
-    steps_per_epoch = 80
-    epochs = 4
+    batch_size = 200
+    epochs = 80
     # print(predict(keras.models.load_model(hdf5_file), "hello baby", 100))
     train_model_twitter(ch2ix,
                         unique_path,
-                        train_validate_split,
                         batch_size,
-                        steps_per_epoch,
                         epochs,
                         loops=loops,
                         unique_number=unique_number
