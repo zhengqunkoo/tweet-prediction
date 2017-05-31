@@ -90,12 +90,61 @@ def build_batch(f, batch_size, ch2ix):
 
     return batch_train, np.array(batch_test)
 
-def predict(model, context, length=1):
-    for i in range(length):
-        res = model.predict(np.array([char2vec(context)]))
-        mx = np.argmax(res)
-        context = context+chr(mx)
-    return context
+def predict(model, unique_file, ch2ix, ix2ch):
+    """
+    reads all metadata from unique_file, passes all except entitiesFull into model
+    model output space separated, match with actual entitiesFull
+
+    scoring does not include Soundex / Levenshtein
+    """
+    num2ix = {str(ix):ix for ix in range(10)}
+    bin2ix = {str(ix):ix for ix in range(2)}
+
+    with open(unique_file, 'rb') as f:
+        for line in f:
+            line = line.strip().split('\t'.encode('ascii', 'backslashreplace'))
+            _, _, created, media, reply, quote, entities_full, entities_shortened = line
+
+            created = char2vec(created, num2ix)
+            media = char2vec(media, bin2ix)
+            reply = char2vec(reply, bin2ix)
+            quote = char2vec(quote, ch2ix)
+            entities_shortened = char2vec(entities_shortened, ch2ix)
+
+            entities_full = entities_full.split(' '.encode('ascii', 'backslashreplace'))
+
+            data = [created, media, reply, quote, entities_shortened]
+            data = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in data]
+
+            # reshape data to have one batch_size
+            # expects array to have shape (None, TWEETSIZE, len(ch2ix))
+            data = [np.reshape(x, (1, x.shape[0], x.shape[1])) for x in data]
+
+            predictions = model.predict(data)
+
+            # numpy arrays to words
+            for word_array in predictions:
+                # normalize each tweet with respect to itself
+                # such that char_array can be distinguished from one another
+                norms = np.linalg.norm(word_array, axis=1, ord=np.inf)
+                word_array = word_array / norms[:, None]
+                # space separated
+                words = []
+                word = ''
+                for char_array in word_array:
+                    ix = np.argmax(char_array)
+                    ch = ix2ch[ix]
+                    if ch == ' ':
+                        words.append(word)
+                        word = ''
+                    else:
+                        word += ch
+                print(words)
+                print(entities_full)
+                score = 0
+                for i in range(len(entities_full)):
+                    score += entities_full[i] == words[i]
+                print(score)
 
 
 def k_best_options(mat, k):
@@ -149,10 +198,9 @@ def charDNN_model(ch2ix):
     entities_shortened_branch = Input(shape=(TWEETSIZE, input_length), dtype='float32', name='entities_shortened_branch')
 
     x = concatenate([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], axis=2)
-    x = Dense(280, dtype='float32', activation='softmax')(x)
-    x = Dense(280, dtype='float32', activation='softmax')(x)
-    x = Dense(280, dtype='float32', activation='softmax')(x)
-    x = Dense(280, dtype='float32', activation='softmax')(x)
+    x = Dense(500, dtype='float32', activation='softmax')(x)
+    x = Dense(350, dtype='float32', activation='softmax')(x)
+    x = Dense(200, dtype='float32', activation='softmax')(x)
     x = Dropout(0.2)(x)
     
     main_output = Dense(input_length, dtype='int32', activation='softmax', name='main_output')(x)
@@ -193,7 +241,7 @@ def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_
                                                  {'main_output':entities_full_data},
                                                  epochs=epochs,
                                                  batch_size=batch_size,
-                                                 callbacks=[ModelCheckpoint("hdf5/weights.{}.{}.hdf5".format(unique_file, loops))]
+                                                 callbacks=[ModelCheckpoint("hdf5/weights.500-350-200.{}.{}.hdf5".format(unique_file, loops))]
                                                  )
 
                     # log loss history in txt file, since tensorboard graph overlaps
@@ -210,7 +258,7 @@ def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_
 if __name__ == "__main__":
     NULLBYTE = '\0'
     NEWLINE = '\37'
-    TWEETSIZE = 160
+    TWEETSIZE = 171
     # assume replace_types identical to replace_types in JSON2Text
     # if replace_types different, wrong prediction
 
@@ -227,21 +275,22 @@ if __name__ == "__main__":
     ascii_spec_chars = [NULLBYTE, NEWLINE] + list(replace_types.values())
     chars = ascii_nonspec_chars + ascii_spec_chars
 
-    ch2ix, _ = get_ch2ix_ix2ch(chars)
+    ch2ix, ix2ch = get_ch2ix_ix2ch(chars)
     
     # parameters to continue training
     unique_path = "train/txt"
-    unique_number = 23 # continue training for files strictly after this number
+    unique_number = 15 # continue training for files strictly after this number
     unique_str = str(unique_number)
     unique_str = "0"*(2 - len(unique_str)) + unique_str
-    loops = 0 # how many times trained over entire fileset
-    hdf5_file = "hdf5/weights.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
+    loops = 100 # how many times trained over entire fileset
+    # hdf5_file = "hdf5/weights.11000-1600-1200.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
     """
     train on 17000 lines per file
     """
     batch_size = 100
-    epochs = 170
-    # print(predict(keras.models.load_model(hdf5_file), "hello baby", 100))
+    epochs = 180
+    predict(load_model("hdf5/weights.500-350-200.tmlc1-training-016.unique.100.hdf5"), "train/txt/tmlc1-training-001.unique", ch2ix, ix2ch)
+    """
     train_model_twitter(ch2ix,
                         unique_path,
                         batch_size,
@@ -249,3 +298,4 @@ if __name__ == "__main__":
                         loops=loops,
                         unique_number=unique_number)
                         #model=load_model(hdf5_file))
+    """
