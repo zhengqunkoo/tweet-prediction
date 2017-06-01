@@ -51,9 +51,6 @@ def build_batch(f, batch_size, ch2ix):
     :param f: file pointer to a .unique file
     '''
     input_length = len(ch2ix)
-    num2ix = {str(ix):ix for ix in range(10)}
-    bin2ix = {str(ix):ix for ix in range(2)}
-
     # assume tweets are TWEETSIZE characters long
     batch_train = []
     batch_test = []
@@ -71,22 +68,22 @@ def build_batch(f, batch_size, ch2ix):
         # then pad zeros to all shorter twitter usernames
 
         # the values below have fixed lengths for all users
-        # quote is either 0 or full quote
-        created = char2vec(created, num2ix)
-        media = char2vec(media, bin2ix)
-        reply = char2vec(reply, bin2ix)
+        created = char2vec(created, ch2ix)
+        media = char2vec(media, ch2ix)
+        reply = char2vec(reply, ch2ix)
+        # quote is either 0 or full tweet
+        # entities_shortened and entities_full can vary in size,
+        # so just pad quote && entities_shortened to full tweet size
         quote = char2vec(quote, ch2ix)
         entities_shortened = char2vec(entities_shortened, ch2ix)
         entities_full = char2vec(entities_full, ch2ix)
+
+        pad_data = [quote, entities_shortened]
+        quote, entities_shortened = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in pad_data]
         
         data = [created, media, reply, quote, entities_shortened]
-        try:
-            data = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in data]
-        except Exception as e:
-            print(str(e))
-            print([x.shape for x in data])
         batch_train.append(data)
-        batch_test.append(np.vstack((entities_full, np.zeros((TWEETSIZE-entities_full.shape[0], entities_full.shape[1])))))
+        batch_test.append(np.vstack((entities_full, np.zeros((TARGETSIZE-entities_full.shape[0], entities_full.shape[1])))))
 
     return batch_train, np.array(batch_test)
 
@@ -97,28 +94,26 @@ def predict(model, unique_file, ch2ix, ix2ch):
 
     scoring does not include Soundex / Levenshtein
     """
-    num2ix = {str(ix):ix for ix in range(10)}
-    bin2ix = {str(ix):ix for ix in range(2)}
-
     with open(unique_file, 'rb') as f:
         for line in f:
             line = line.strip().split('\t'.encode('ascii', 'backslashreplace'))
             _, _, created, media, reply, quote, entities_full, entities_shortened = line
 
-            created = char2vec(created, num2ix)
-            media = char2vec(media, bin2ix)
-            reply = char2vec(reply, bin2ix)
+            created = char2vec(created, ch2ix)
+            media = char2vec(media, ch2ix)
+            reply = char2vec(reply, ch2ix)
             quote = char2vec(quote, ch2ix)
             entities_shortened = char2vec(entities_shortened, ch2ix)
 
-            entities_full = entities_full.split(' '.encode('ascii', 'backslashreplace'))
-
+            pad_data = [quote, entities_shortened]
+            quote, entities_shortened = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in pad_data]
+            
             data = [created, media, reply, quote, entities_shortened]
-            data = [np.vstack((x, np.zeros((TWEETSIZE-x.shape[0], x.shape[1])))) for x in data]
+            entities_full = entities_full.split(' '.encode('ascii', 'backslashreplace'))
 
             # reshape data to have one batch_size
             # expects array to have shape (None, TWEETSIZE, len(ch2ix))
-            data = [np.reshape(x, (1, x.shape[0], x.shape[1])) for x in data]
+            data = [np.reshape(x, (1, ) + x.shape) for x in data]
 
             predictions = model.predict(data)
 
@@ -139,10 +134,14 @@ def predict(model, unique_file, ch2ix, ix2ch):
                         word = ''
                     else:
                         word += ch
+                # append last word
+                words.append(word)
+
+                # print(word_array)
                 print(words)
                 print(entities_full)
                 score = 0
-                for i in range(len(entities_full)):
+                for i in range(len(words)):
                     score += entities_full[i] == words[i]
                 print(score)
 
@@ -163,7 +162,7 @@ def get_key_strokes(string):
     return len(list(filter(lambda x: x == " ", string)))
 
 
-def beam_search(model, keystrokes, thickness =2, pruning=10, context=["a",1]):
+def beam_search(model, keystrokes, thickness=2, pruning=10, context=["a",1]):
     """
     Beam search: this takes a model and uses beam search as a method to find most probable
        string. The aim is to allow for better predictions without being overly greedy.
@@ -191,19 +190,21 @@ def charDNN_model(ch2ix):
     """
     input_length = len(ch2ix)
 
-    created_branch = Input(shape=(TWEETSIZE, 10), dtype='float32', name='created_branch')
-    media_branch = Input(shape=(TWEETSIZE, 2), dtype='float32', name='media_branch')
-    reply_branch = Input(shape=(TWEETSIZE, 2), dtype='float32', name='reply_branch')
+    created_branch = Input(shape=(CREATEDSIZE, input_length), dtype='float32', name='created_branch')
+    media_branch = Input(shape=(MEDIASIZE, input_length), dtype='float32', name='media_branch')
+    reply_branch = Input(shape=(REPLYSIZE, input_length), dtype='float32', name='reply_branch')
     quote_branch = Input(shape=(TWEETSIZE, input_length), dtype='float32', name='quote_branch')
     entities_shortened_branch = Input(shape=(TWEETSIZE, input_length), dtype='float32', name='entities_shortened_branch')
 
-    x = concatenate([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], axis=2)
+    x = concatenate([created_branch, media_branch, reply_branch, quote_branch, entities_shortened_branch], axis=1)
+    x = Dense(600, dtype='float32', activation='softmax')(x)
+    x = Dense(550, dtype='float32', activation='softmax')(x)
     x = Dense(500, dtype='float32', activation='softmax')(x)
-    x = Dense(350, dtype='float32', activation='softmax')(x)
-    x = Dense(200, dtype='float32', activation='softmax')(x)
+    x = Dense(550, dtype='float32', activation='softmax')(x)
+    x = Dense(400, dtype='float32', activation='softmax')(x)
     x = Dropout(0.2)(x)
     
-    main_output = Dense(input_length, dtype='int32', activation='softmax', name='main_output')(x)
+    main_output = Dense(input_length, dtype='float32', activation='softmax', name='main_output')(x)
 
     model = Model(inputs=[created_branch,
                           media_branch,
@@ -231,7 +232,12 @@ def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_
                     print("training on {}...".format(unique_file))
 
                     input_data, entities_full_data = build_batch(f, batch_size, ch2ix)
-                    created_data, media_data, reply_data, quote_data, entities_shortened_data = map(lambda x : np.asarray(x), zip(*input_data))
+                    # group all data of the same type together
+                    created_data, \
+                    media_data, \
+                    reply_data, \
+                    quote_data, \
+                    entities_shortened_data = map(lambda x : np.asarray(x), zip(*input_data))
                     history_callback = model.fit({'created_branch':created_data,
                                                   'media_branch':media_data,
                                                   'reply_branch':reply_data,
@@ -258,44 +264,36 @@ def train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=0, unique_
 if __name__ == "__main__":
     NULLBYTE = '\0'
     NEWLINE = '\37'
+    CREATEDSIZE = 14
+    MEDIASIZE = 1
+    REPLYSIZE = 1
     TWEETSIZE = 171
+    # because concatenate on other axis, need pad entities_full (target) to combined length of all inputs
+    TARGETSIZE = CREATEDSIZE + MEDIASIZE + REPLYSIZE + TWEETSIZE * 2
     # assume replace_types identical to replace_types in JSON2Text
     # if replace_types different, wrong prediction
-
     # hashtag, userMention are not replaced
+    replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
+    ascii_nonspec_chars = [chr(x) for x in range(32, 128)]
+    ascii_spec_chars = [NULLBYTE, NEWLINE] + list(replace_types.values())
+    chars = ascii_nonspec_chars + ascii_spec_chars
 
     # character array will enumerate according to sorted characters.
     # if the order of the ASCII special chars in replace_types changes,
     # e.g.      'number':'\33', 'url':'\34' => number < url
     # becomes   'number':'\34', 'url':'\33' => url < number
     # then enumeration index changes, and old model will not be compatible with new model
-
-    replace_types = {'number':'\33', 'url':'\34', 'punctuation':'\35', 'emoji':'\36'}
-    ascii_nonspec_chars = [chr(x) for x in range(32, 128)]
-    ascii_spec_chars = [NULLBYTE, NEWLINE] + list(replace_types.values())
-    chars = ascii_nonspec_chars + ascii_spec_chars
-
     ch2ix, ix2ch = get_ch2ix_ix2ch(chars)
     
     # parameters to continue training
     unique_path = "train/txt"
-    unique_number = 15 # continue training for files strictly after this number
+    unique_number = 0 # continue training for files strictly after this number
     unique_str = str(unique_number)
     unique_str = "0"*(2 - len(unique_str)) + unique_str
-    loops = 100 # how many times trained over entire fileset
-    # hdf5_file = "hdf5/weights.11000-1600-1200.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
-    """
-    train on 17000 lines per file
-    """
-    batch_size = 100
-    epochs = 180
-    predict(load_model("hdf5/weights.500-350-200.tmlc1-training-016.unique.100.hdf5"), "train/txt/tmlc1-training-001.unique", ch2ix, ix2ch)
-    """
-    train_model_twitter(ch2ix,
-                        unique_path,
-                        batch_size,
-                        epochs,
-                        loops=loops,
-                        unique_number=unique_number)
-                        #model=load_model(hdf5_file))
-    """
+    loops = 0 # how many times trained over entire fileset
+    hdf5_file = "hdf5/weights.11000-1600-1200.tmlc1-training-0{}.unique.{}.hdf5".format(unique_str, loops)
+    # train on 16000 lines per file
+    batch_size = 50
+    epochs = 100
+    # predict(load_model("hdf5/weights.500-350-200.tmlc1-training-002.unique.0.hdf5"), "train/txt/tmlc1-training-001.unique", ch2ix, ix2ch)
+    train_model_twitter(ch2ix, unique_path, batch_size, epochs, loops=loops, unique_number=unique_number)#, model=load_model(hdf5_file))
