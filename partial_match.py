@@ -19,20 +19,20 @@ def levenshtein(s, t):
 		return True
 
 	lens, lent = len(s), len(t)
-	if lens + 1 == lent:
-		# test if 1 insert into s => t
-		for i in range(lent):
-			if s == (t[:i] + t[i+1:]):
-				return True
-	elif lent + 1 == lens:
-		# test if 1 insert into t => s
+	if lens - 1 == lent:
+		# test if delete 1 from s => t
 		for i in range(lens):
 			if t == (s[:i] + s[i+1:]):
 				return True
+	elif lent - 1 == lens:
+		# test if delete 1 from t => s
+		for i in range(lent):
+			if s == (t[:i] + t[i+1:]):
+				return True
 	elif lent == lens:
 		# test if 1 substitution into t => s
-		for i in range(lent - 1):
-			if s == (t[:i] + t[i+1:]):
+		for i in range(lent):
+			if (s[:i] + s[i+1:]) == (t[:i] + t[i+1:]):
 				return True
 	return False
 
@@ -72,7 +72,7 @@ def soundex(s):
 	flag_to_code = -1
 	# let ch be all consonants without same sound as neighbor
 	for i, ch in enumerate(s):
-		if i == 0 or (ch != s[i-1] and not same_sound(ch, s[i-1])):
+		if i == 0 or (ch != s[i-1] and not same_sound(ch, s[i-1], codes)):
 			if ch in cnsnts:
 				# if flag True 
 				if flag_to_code:
@@ -96,22 +96,24 @@ def soundex(s):
 
 	return full_code
 
-def same_sound(a, b):
+def same_sound(a, b, codes):
 	"""
 	given two chars a, b, and a soundex code,
 	return true if a and b have same soundex code,
 	return false if different soundex code, or either not in soundex code
 	"""
-	codes = ['BFPV','CGJKQSXZ','DT','L','MN','R']
 	for code in codes:
 		if a in code and b in code:
 			return True
 	return False
 
 if __name__ == '__main__':
-	tests = ['Gutierrez', 'Pfister', 'Jackson', 'VanDeusen', 'Tymczak', 'Ashcraft']
+	# this soundex implementation follows standard rules, but:
+	# if first letter in soundex not soundex consonant, then not recorded
+	# soundex codes can be longer than 4 characters
+	tests = ['Gutierrez','Pfister','Jackson','VanDeusen','Tymczak','Ashcraft']
 	tests = [x.upper() for x in tests]
-	targets = [[2,3,6,2], [1,2,3,6], [2,2,5], [1,5,3,2], [3,5,2,2], [2,6,1]]
+	targets = [[2,3,6,2], [1,2,3,6], [2,2,5], [1,5,3,2,5], [3,5,2,2], [2,6,1,3]]
 
 	print('testing soundex...')
 	print('errors:')
@@ -121,20 +123,22 @@ if __name__ == '__main__':
 			print(tests[i], res)
 	print()
 
-	from itertools import combinations_with_replacement
-	# all possible levenshtein
-	tests = [['Gutierrez','utierrez','Gtierrez','Guierrez','Guterrez','Gutirrez','Gutierez','Gutierrz','Gutierre'],
-			 ['Pfister','fister','Pister','Pfster','Pfiter','Pfiser','Pfistr','Pfiste'],
-			 ['Jackson','ackson','Jckson','Jakson','Jacson','Jackon','Jacksn','Jackso'],
-			 ['VanDeusen','anDeusen','VnDeusen','VaDeusen','Vaneusen','VanDusen','VanDesen','VanDeuen','VanDeusn','VanDeuse'],
-			 ['Tymczak','ymczak','Tmczak','Tyczak','Tymzak','Tymcak','Tymczk','Tymcza'],
-			 ['Ashcraft','shcraft','Ahcraft','Ascraft','Ashraft','Ashcaft','Ashcrft','Ashcrat','Ashcraf']
-			]
-	tests = [[x.upper() for x in y] for y in tests]
+	# all possible levenshtein	
+	targets = ['Gutierrez', 'Pfister', 'Jackson', 'VanDeusen', 'Tymczak', 'Ashcraft']
+	targets = [x.upper() for x in targets]
+
+	insert_tests = [[target[:ix] + '9' + target[ix:] for ix in range(len(target))] for target in targets]
+	sub_tests = [[target[:ix] + '9' + target[ix+1:] for ix in range(len(target))] for target in targets]
+	delete_tests = [[target[:ix] + target[ix+1:] for ix in range(len(target))] for target in targets]
+	
+	all_tests = [insert_tests, sub_tests, delete_tests]
+
 	print('testing levenshtein...')
 	print('errors:')
-	for test in tests:
-		for combination in combinations_with_replacement(test, 2):
-			res = levenshtein(*combination)
-			if not res:
-				print(combination, res)
+	for tests in all_tests:
+		for i in range(len(tests)):
+			target = targets[i]
+			for rest in tests[i]:
+				res = levenshtein(target, rest)
+				if not res:
+					print(target, rest, res)
