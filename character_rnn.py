@@ -1,6 +1,7 @@
 import ParseJSON
 import numpy as np
 import sys
+from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
 
@@ -127,7 +128,7 @@ def charRNN_model():
     This Builds a character RNN based on kaparthy's infamous blog post
     :return: None
     """
-    model = keras.models.Sequential()
+    model = Sequential()
     model.add(LSTM(512, input_shape=(None, 128)))
     model.add(Dropout(0.2))
     model.add(Dense(128, activation='softmax'))
