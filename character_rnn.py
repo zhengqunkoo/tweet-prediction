@@ -1,8 +1,8 @@
 import ParseJSON
-import keras.models
 import numpy as np
 import sys
-from keras.layers import GRU, Dropout, Dense
+from test_ijson import *
+from keras.layers import LSTM, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
 
 
@@ -88,32 +88,48 @@ def get_key_strokes(string):
     return len(list(filter(lambda x: x == " ", string)))
 
 
+def stopping_condition(context, key_strokes):
+    cond = True
+    for i in context:
+        if len(context) > 140:
+            return True
+        if context[-1] != "\0":
+            cond = False
+        if get_key_strokes(i) > key_strokes:
+            cond = False
+    return cond
+
+
 def beam_search(model, keystrokes, thickness =2, pruning=10, context=["a",1]):
     """
     Beam search: this takes a model and uses beam search as a method to find most probable
        string. The aim is to allow for better predictions without being overly greedy.
+    TODO: write unit test
     """
-    stack = []
-    for current, c_prob in context:
-        if current[-1] == " ": 
-            res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
-            best = np.argmax(res)
-            predictions = [(chr(best),res[best])]
-        elif current[-1] == "\0":
-            continue
-        else:
-            res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
-            predictions = k_best_options(res,thickness)
-        for prediction, probability in predictions:
-            stack.append((current+prediction, c_prob*probability))
-    context = sorted(stack,key=lambda x: x[2])
+    while not stopping_condition(context, len(keystrokes)):
+        stack = []
+        for current, c_prob in context:
+            if current[-1] == " ": 
+                res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
+                best = np.argmax(res)
+                predictions = [(chr(best),res[best])]
+            elif current[-1] == "\0":
+                continue
+            else:
+                res = model.predict(np.array([char2vec(current+keystrokes[get_key_strokes(current)])]))
+                predictions = k_best_options(res,thickness)
+            for prediction, probability in predictions:
+                stack.append((current+prediction, c_prob*probability))
+        context = sorted(stack,key=lambda x: x[2])
+    return context
+
 def charRNN_model():
     """
     This Builds a character RNN based on kaparthy's infamous blog post
     :return: None
     """
     model = keras.models.Sequential()
-    model.add(GRU(512, input_shape=(None, 128)))
+    model.add(LSTM(512, input_shape=(None, 128)))
     model.add(Dropout(0.2))
     model.add(Dense(128, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -128,7 +144,7 @@ def train_model_twitter(file, model=charRNN_model()):
     # let output of ParseJSON always be entitiesFull of values
     keys = [['entitiesFull', 'value']]
     json_file = ParseJSON.ParseJSON(file, keys)
-    model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=2000,
+    model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=4000,
                         callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
 
 
