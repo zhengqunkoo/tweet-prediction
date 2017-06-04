@@ -1,7 +1,6 @@
 import ParseJSON
 import numpy as np
 import sys
-from test_ijson import *
 from keras.layers import LSTM, Dropout, Dense
 from keras.callbacks import TensorBoard,ModelCheckpoint
 
@@ -136,7 +135,7 @@ def charRNN_model():
     return model
 
 
-def train_model_twitter(file, model=charRNN_model()):
+def train_model_twitter(file, model=charRNN_model(), generator = build_batch):
     """
     This function trains the data on the character network
     :return: 
@@ -144,7 +143,7 @@ def train_model_twitter(file, model=charRNN_model()):
     # let output of ParseJSON always be entitiesFull of values
     keys = [['entitiesFull', 'value']]
     json_file = ParseJSON.ParseJSON(file, keys)
-    model.fit_generator(build_batch(json_file), steps_per_epoch=100, epochs=4000,
+    model.fit_generator(generator(json_file), steps_per_epoch=100, epochs=4000,
                         callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{epoch:02d}.hdf5")])
 
 

@@ -83,7 +83,11 @@ def training_batch_generator(fname, length = 300):
     Train on this generator to get one file's data
     """
     for inputs, expectation in _input2training_batch(fname, maxlen=length):
-        yield np.arrray([char2vec(inputs)]),np.array(char2vec)
+        yield np.arrray([char2vec(inputs)]),np.array(char2vec(expectation))
 
-
+if __name__ == "__main__":
+    import character_rnn
+    import sys
+    print("Starting training...")
+    character_rnn.train_model_twitter(sys.argv[1],generator = training_batch_generator)
     
