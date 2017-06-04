@@ -1,6 +1,15 @@
+"""
+Defines functions to handle metadata
+"""
 import ijson
 import numpy as np
+
 def parse_input(fname):
+    """
+    :param fname - file name
+    This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
+    The generator sanitizes the data to prevent problems from occuring
+    """
     with open(fname) as f:
         for obj in ijson.items(f,"item"):
             user = obj["user"]
@@ -26,15 +35,19 @@ def parse_input(fname):
             yield "".join(inputs)," ".join(expected_out)
             
 
-def input2training_batch(fname, max_len=300):
+def _input2training_batch(fname, max_len=300):
+    """
+    sanitizes the input data... prevents things from overflowing
+    """
     for inputs, outputs in parse_input(fname):
         curr_buff = inputs+"\t"
+        if len(outputs) + len(inputs) == 3:
+            # skip too long
+            # TODO: write to seperate file if tweet data is too long
+            continue
         for c in outputs:
             yield curr_buff,c
-            if len(curr_buff) < max_len:
-                curr_buff = curr_buff + c
-            else:
-                curr_buff = inputs+"\t"
+            curr_buff = curr_buff + c
 
 def char2vec(char_sequence):
     """
@@ -63,4 +76,14 @@ def pad_upto(array, length = 300):
     300
     """
     return [np.array([0]*128) for i in range(length-len(array))] + array
+
+def training_batch_generator(fname, length = 300):
+    """
+    :param fname - file name
+    Train on this generator to get one file's data
+    """
+    for inputs, expectation in _input2training_batch(fname, maxlen=length):
+        yield np.arrray([char2vec(inputs)]),np.array(char2vec)
+
+
     
