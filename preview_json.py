@@ -1,22 +1,32 @@
 import json
 
 def preview_json():
-	file = 'train/tmlc1-training-001.json'
+	# dirty way to get id and entitiesShortened
+	# extra comma at the last character of entitiesShortened
+	file = 'test/tmlc1-testing-011.json'
 	with open('result.txt', 'w', encoding='utf8') as f:
 		s = json.loads(open(file).read())
-		q = [f.write(j['quotedText'] + '\n\n\n') for j in s if j['quotedText']]
+		for j in s:
+			f.write('"')
+			f.write(j['id'])
+			f.write('":[')
+			for k in j['entitiesShortened']:
+				if k['type'] == 'letter':
+					f.write('"')
+					f.write(k['value'])
+					f.write('",')
+			f.write('],\n')
 
 def preview_txt():
-	file = 'train/txt/tmlc1-training-006.txt'
+	file = 'test/txt/tmlc1-testing-001.txt'
 	with open(file, 'rb') as f:
 		for s in f:
 			s = s.split('\t'.encode('ascii', 'backslashreplace'))
-			if s[5] != b'0':
-				print(s[5])
+			print(s)
 
 if __name__ == '__main__':
-	# preview_json()
-	preview_txt()
+	preview_json()
+	# preview_txt()
 """
 004.txt
 b'FYI: Love should always bring you home last night, tonight, and tomorrow night...unless otherwise instructed lol.'
