@@ -7,6 +7,7 @@ import json
 import os
 from keras.models import load_model
 
+
 def parse_test_case(test_case):
 	"""
 	Parses a JSON file and yields 2 objects:
@@ -113,7 +114,21 @@ def parse_input(fname):
 					expected_out.append(item["value"])
 
 			yield "".join(inputs)," ".join(expected_out)
-			
+
+def mix_generators(*args):
+        """
+        Takes a bunch of generators and returns a generator which samples
+        each generator
+        """
+        generators = list(args)
+        i = 0
+        while len(generators) > 0:
+                try:
+                        yield next(generators[i%len(generators)])
+                except:
+                        del generators[i%len(generators)]
+                finally:
+                        i+=1
 
 def _input2training_batch(fname, max_len=300):
 	"""
@@ -196,11 +211,10 @@ if __name__ == "__main__":
 	import character_rnn
 	import sys
 	print("Starting testing...")
-	if len(sys.argv) >= 3:
+	if len(sys.argv) > 3:
 		for prediction in test_model_twitter(*sys.argv[1:]):
 			print(prediction)
 	else:
 		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
-
-	# character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
+		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
 	
