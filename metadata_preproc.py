@@ -4,6 +4,30 @@ Defines functions to handle metadata
 import ijson
 import numpy as np
 
+def parse_test_case(test_case):
+    """
+    Parses a JSON file and returns an initial string for predicting on
+    """
+    for obj in ijson.items(f,"item"):
+        user = obj["user"]
+        entities_shortened = obj["entitiesShortened"]
+        inputs = []
+        for item in entities_shortened:
+            if item["type"] == "userMention":
+                inputs.append("\1@"+item["value"]+"\1")
+            elif item["type"] == "hashtag":
+                inputs.append("\2#"+item["value"]+"\2")
+            elif item["type"] == "url":
+                inputs.append("\3<link>\3")
+            else:
+                inputs.append(item["value"])
+        return "".join(inputs)
+    
+def predict(model, length):
+    """
+    beam search through the RNNs
+    """
+    pass
 def parse_input(fname):
     """
     :param fname - file name
