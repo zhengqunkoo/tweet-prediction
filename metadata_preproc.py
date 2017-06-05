@@ -83,7 +83,7 @@ def training_batch_generator(fname, length = 300):
     Train on this generator to get one file's data
     """
     for inputs, expectation in _input2training_batch(fname, max_len=length):
-        yield np.arrray([char2vec(inputs)]),np.array(char2vec(expectation))
+        yield np.array([char2vec(inputs)]),np.array(char2vec(expectation))
 
 if __name__ == "__main__":
     import character_rnn
