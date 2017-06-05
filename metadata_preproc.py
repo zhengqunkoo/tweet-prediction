@@ -3,12 +3,13 @@ Defines functions to handle metadata
 """
 import ijson
 import numpy as np
+import json
 
 def parse_test_case(test_case):
     """
     Parses a JSON file and returns an initial string for predicting on
     """
-    for obj in ijson.items(f,"item"):
+    for obj in json.loads(test_case):
         user = obj["user"]
         entities_shortened = obj["entitiesShortened"]
         inputs = []
@@ -22,12 +23,39 @@ def parse_test_case(test_case):
             else:
                 inputs.append(item["value"])
         return "".join(inputs)
-    
-def predict(model, length):
+
+
+def get_probabilities(model, string):
+    """
+    :param model - the model
+    :param string- the seed with which to feed the model
+    returns thee porbabilities for each of the next characters
+    """
+    return model.predict(np.array([char2vec(String)]))
+
+
+def get_k_highest_probabilities(probabilities, k=5):
+    """
+    given a numpy matrix of probabilities,
+    return the ids with the highest probability 
+    """
+    max_probs = []    
+    for i in range(k):
+        letter = chr(np.argmax(probabilities))
+        max_probs.append((letter, probabilities[ord(letter)]))
+        probabilities[ord(letter)] = 0
+    return max_probs
+
+def beam_search(model, seed, k=5, length=140):
     """
     beam search through the RNNs
     """
-    pass
+    best_of_k = [seed]*k
+    for i in range(length):
+        new_predictions = []
+        for item in best_of_k:
+            prob = get_probabilities(model,seed)
+            get_k_highest_probabilities(prob,k)
 def parse_input(fname):
     """
     :param fname - file name
@@ -73,6 +101,7 @@ def _input2training_batch(fname, max_len=300):
             yield curr_buff,c
             curr_buff = curr_buff + c
 
+
 def char2vec(char_sequence):
     """
     :param char_sequence - a sequence of characters
@@ -108,10 +137,11 @@ def training_batch_generator(fname, length = 300):
     """
     for inputs, expectation in _input2training_batch(fname, max_len=length):
         yield np.array([char2vec(inputs)]),np.array(char2vec(expectation))
-
+"""
 if __name__ == "__main__":
     import character_rnn
     import sys
     print("Starting training...")
     character_rnn.train_model_twitter(sys.argv[1],generator = training_batch_generator)
     
+"""
