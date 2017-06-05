@@ -61,7 +61,7 @@ def url_download(domain, file_sequence, dirpath, EMAIL, AUTHKEY):
 			errors.apppend(url + '\t' + e)
 
 		# check if contents show success or failure
-		if contents and loads(contents.decode('utf-8'))['success'] != False:
+		if contents:# and loads(contents.decode('utf-8'))['success'] != False:
 			downloaded.append(file)
 			with open(dirpath + file, 'wb') as f:
 				f.write(contents)
