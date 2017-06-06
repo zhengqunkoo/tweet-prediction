@@ -18,7 +18,10 @@ def parse_test_case(test_case):
 		user = obj["user"]
 		entities_shortened = obj["entitiesShortened"]
 		inputs = []
+		first_item = None
 		for item in entities_shortened:
+                        if not first_item:
+                                first_item = item["value"]
 			if item["type"] == "userMention":
 				inputs.append("\1@"+item["value"]+"\1")
 			elif item["type"] == "hashtag":
@@ -27,7 +30,7 @@ def parse_test_case(test_case):
 				inputs.append("\3<link>\3")
 			else:
 				inputs.append(item["value"])
-		yield obj["id"], "".join(inputs)
+		yield obj["id"], "".join(inputs)+"\t"+first_item
 
 
 def get_probabilities(model, string):
@@ -52,7 +55,7 @@ def get_k_highest_probabilities(probabilities, k=5):
 	return max_probs
 
 
-def beam_search(model, seed, letters = [], k=3, j=10, length=140):
+def beam_search(model, seed, letters = [], k=3, j=10, length=140, limit_by_word_num = False):
 	"""
 	:param model: the model
 	:param seed: string provided to model on initialization
@@ -82,8 +85,11 @@ def beam_search(model, seed, letters = [], k=3, j=10, length=140):
 			new_top_k = {}
 			if seed[-1] == " ":
                                 letter_ind += 1
-                                top_k[seed + letters[letter_ind]] = top_k
-                                continue
+                                try:
+                                        top_k[seed + letters[letter_ind]] = top_k
+                                        continue
+                                except IndexError:
+                                        if limit_by_word_num: continue
 			max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 			for letter, prob in max_probs.items():
 				new_top_k[seed + letter] = c_prob * prob
@@ -150,6 +156,8 @@ def _input2training_batch(fname, max_len=300):
 			yield curr_buff,c
 			curr_buff = curr_buff + c
 
+def strip_prediction(string):
+        return string.split("\t")[1]
 
 def char2vec(char_sequence):
 	"""
