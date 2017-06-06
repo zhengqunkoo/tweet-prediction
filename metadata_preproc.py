@@ -210,11 +210,25 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
 if __name__ == "__main__":
 	import character_rnn
 	import sys
+<<<<<<< HEAD
 	print("Starting testing...")
 	if len(sys.argv) > 3:
+=======
+	print("Starting training...")
+	if len(sys.argv) == 2:
+		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
+	else:
+		print("Usage: %s [json files]"%sys.argv[0])
+	"""
+	if len(sys.argv) >= 3:
+>>>>>>> 586766b30c7ba19a6098e8deb2528f945afad9c7
 		for prediction in test_model_twitter(*sys.argv[1:]):
 			print(prediction)
 	else:
 		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
+<<<<<<< HEAD
 		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
 	
+=======
+	"""
+>>>>>>> 586766b30c7ba19a6098e8deb2528f945afad9c7
