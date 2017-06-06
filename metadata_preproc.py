@@ -52,7 +52,7 @@ def get_k_highest_probabilities(probabilities, k=5):
 	return max_probs
 
 
-def beam_search(model, seed, k=3, j=10, length=140):
+def beam_search(model, seed, letters = [], k=3, j=10, length=140):
 	"""
 	:param model: the model
 	:param seed: string provided to model on initialization
@@ -75,9 +75,15 @@ def beam_search(model, seed, k=3, j=10, length=140):
 
 	# assume all strings in top_k are same length,
 	# then checking stopping condition for one string, means all strings satisfy the condition as well
+	letter_ind = 0
 	while len(list(top_k.keys())[0]) <= length:
-		for seed, c_prob in top_k.items():
+                items = top_k.items()
+		for seed, c_prob in items:
 			new_top_k = {}
+			if seed[-1] == " ":
+                                letter_ind += 1
+                                top_k[seed + letters[letter_ind]] = top_k
+                                continue
 			max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 			for letter, prob in max_probs.items():
 				new_top_k[seed + letter] = c_prob * prob
@@ -203,7 +209,7 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
                 model =load_model(modelpath)
 		for tweet_id, string in parse_test_case(f.readline()):
 			# seed string is same length that was used in training
-			top_k = beam_search(model, string[:window_size], k=k, j=j, length=140)
+			top_k = beam_search(model, string[:], k=k, j=j, length=140)
 			# for the same user, yield each of the top_k predictions
 			for prediction in top_k:
 				yield {tweet_id : prediction.split(' ')}
