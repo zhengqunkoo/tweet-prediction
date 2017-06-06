@@ -200,9 +200,10 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
 	{'revfvdonwg0': ['R\x01@Eman36\x01:\x01@mikezigg', 'and', 'the', 'readersioua', 'ofrate', 'yations', 'tho', 'corsemitere', '.ereath', 'yat', 'ofedesteris', '.egentiog', 'ano', 'peater', 'teede', 'yourrcanl', 'teed', 'te']}
 	"""
 	with open(jsonpath, 'r') as f:
+                model =load_model(modelpath)
 		for tweet_id, string in parse_test_case(f.readline()):
 			# seed string is same length that was used in training
-			top_k = beam_search(load_model(modelpath), string[:window_size], k=k, j=j, length=140)
+			top_k = beam_search(model, string[:window_size], k=k, j=j, length=140)
 			# for the same user, yield each of the top_k predictions
 			for prediction in top_k:
 				yield {tweet_id : prediction.split(' ')}
@@ -210,25 +211,9 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
 if __name__ == "__main__":
 	import character_rnn
 	import sys
-<<<<<<< HEAD
-	print("Starting testing...")
-	if len(sys.argv) > 3:
-=======
 	print("Starting training...")
 	if len(sys.argv) == 2:
 		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
 	else:
 		print("Usage: %s [json files]"%sys.argv[0])
-	"""
-	if len(sys.argv) >= 3:
->>>>>>> 586766b30c7ba19a6098e8deb2528f945afad9c7
-		for prediction in test_model_twitter(*sys.argv[1:]):
-			print(prediction)
-	else:
-		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
-<<<<<<< HEAD
-		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
-	
-=======
-	"""
->>>>>>> 586766b30c7ba19a6098e8deb2528f945afad9c7
+
