@@ -7,6 +7,7 @@ import json
 import os
 from keras.models import load_model
 
+
 def parse_test_case(test_case):
 	"""
 	Parses a JSON file and yields 2 objects:
@@ -113,7 +114,21 @@ def parse_input(fname):
 					expected_out.append(item["value"])
 
 			yield "".join(inputs)," ".join(expected_out)
-			
+
+def mix_generators(*args):
+        """
+        Takes a bunch of generators and returns a generator which samples
+        each generator
+        """
+        generators = list(args)
+        i = 0
+        while len(generators) > 0:
+                try:
+                        yield next(generators[i%len(generators)])
+                except:
+                        del generators[i%len(generators)]
+                finally:
+                        i+=1
 
 def _input2training_batch(fname, max_len=300):
 	"""
@@ -185,9 +200,10 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
 	{'revfvdonwg0': ['R\x01@Eman36\x01:\x01@mikezigg', 'and', 'the', 'readersioua', 'ofrate', 'yations', 'tho', 'corsemitere', '.ereath', 'yat', 'ofedesteris', '.egentiog', 'ano', 'peater', 'teede', 'yourrcanl', 'teed', 'te']}
 	"""
 	with open(jsonpath, 'r') as f:
+                model =load_model(modelpath)
 		for tweet_id, string in parse_test_case(f.readline()):
 			# seed string is same length that was used in training
-			top_k = beam_search(load_model(modelpath), string[:window_size], k=k, j=j, length=140)
+			top_k = beam_search(model, string[:window_size], k=k, j=j, length=140)
 			# for the same user, yield each of the top_k predictions
 			for prediction in top_k:
 				yield {tweet_id : prediction.split(' ')}
@@ -200,10 +216,4 @@ if __name__ == "__main__":
 		character_rnn.train_model_twitter(sys.argv[1], generator=training_batch_generator)
 	else:
 		print("Usage: %s [json files]"%sys.argv[0])
-	"""
-	if len(sys.argv) >= 3:
-		for prediction in test_model_twitter(*sys.argv[1:]):
-			print(prediction)
-	else:
-		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
-	"""
+
