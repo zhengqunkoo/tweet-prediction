@@ -90,7 +90,8 @@ def parse_input(fname):
 	This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
 	The generator sanitizes the data to prevent problems from occuring
 	"""
-	with open(fname) as f:
+	# https://github.com/isagalaev/ijson/issues/54
+	with open(fname, 'rb') as f:
 		for obj in ijson.items(f,"item"):
 			user = obj["user"]
 			entities_shortened = obj["entitiesShortened"]
@@ -207,14 +208,16 @@ if __name__ == "__main__":
 	import character_rnn
 	import sys
 	print("Starting training...")
-	"""
 	if len(sys.argv) >= 2:
 		count = 0
 		pre = 0
 		for file in sys.argv[1:]:
+			print("loading model weights.",end="")
 			if count == 0:
+				print("{}.hdf5".format(file))
 				character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(file)), generator=training_batch_generator)
 			else:
+				print("{}.hdf5".format(pre))
 				character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
 			count += 1
 			pre = file
@@ -228,3 +231,4 @@ if __name__ == "__main__":
 			print(prediction)
 	else:
 		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
+	"""
