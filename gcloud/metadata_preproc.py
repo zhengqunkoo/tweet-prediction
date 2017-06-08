@@ -6,17 +6,22 @@ import numpy as np
 import json
 import os
 from keras.models import load_model
+import re
+from string import punctuation, digits
+from math import log
 
 def parse_test_case(test_case):
 	"""
-	Parses a JSON file and yields 2 objects:
+	Parses a JSON file and yields 3 objects:
 	tweet_id
 	an initial string for predicting on
+	entities_shortened (letters only)
 	"""
+	
 	for obj in json.loads(test_case):
 		user = obj["user"]
 		entities_shortened = obj["entitiesShortened"]
-		inputs = []
+		inputs, letters = [], []
 		for item in entities_shortened:
 			if item["type"] == "userMention":
 				inputs.append("\1@"+item["value"]+"\1")
@@ -26,8 +31,8 @@ def parse_test_case(test_case):
 				inputs.append("\3<link>\3")
 			else:
 				inputs.append(item["value"])
-		yield obj["id"], "".join(inputs)
-
+				letters.append(item["value"])
+		yield obj["id"], "".join(inputs), "".join(letters)
 
 def get_probabilities(model, string):
 	"""
@@ -51,13 +56,13 @@ def get_k_highest_probabilities(probabilities, k=5):
 	return max_probs
 
 
-def beam_search(model, seed, k=3, j=10, length=140):
+def beam_search(model, seed, letters, k=3, j=10):
 	"""
 	:param model: the model
-	:param seed: string provided to model on initialization
 	:param k: number of probabilities to keep at every step, default 3.
 	:param j: number of probabilities to search at every step, default 10.
-	:param length: maximum length of predicted strings, default 140.
+	:param seed: initial input to model (metadata)
+	:param letters: string of first letters from entities_shortened
 
 	beam search through the RNNs
 	at every step
@@ -67,53 +72,78 @@ def beam_search(model, seed, k=3, j=10, length=140):
 
 	returns: list of strings with top k probabilities
 	"""
-	# top_k: key: seed string, value: probability so far
+	# top_k: key: seed string, value: [logarithmic probability so far, letter_ind]
+	# each prediction tracks its own letter_ind
 	top_k = {}
+	# strip ' ' from seed so don't skip first word
+	seed = seed.strip(' ')
 	for _ in range(k):
-		top_k[seed] = 1
-
-	# assume all strings in top_k are same length,
-	# then checking stopping condition for one string, means all strings satisfy the condition as well
-	while len(list(top_k.keys())[0]) <= length:
-		for seed, c_prob in top_k.items():
+		top_k[seed] = [0, 0]
+	while True:
+		for seed, value in top_k.items():
+			c_prob, letter_ind = value
 			new_top_k = {}
-			max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
-			for letter, prob in max_probs.items():
-				new_top_k[seed + letter] = c_prob * prob
+			if seed[-1] == " ":
+				try:
+					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
+				except IndexError:
+					# finished predicting last word, return
+					# remove extra space at end of prediction
+					return [prediction.strip(' ') for prediction in list(top_k.keys())]
+			else:
+				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
+				for letter, prob in max_probs.items():
+					# use logarithmic probs
+					new_top_k[seed + letter] = [c_prob + log(prob), letter_ind]
 			# from j candidates, keep top k probabilities
-			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1], reverse=True)[:k])
-	return list(top_k.keys())
+			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])
+	
 
 def parse_input(fname):
-	"""
-	:param fname - file name
-	This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
-	The generator sanitizes the data to prevent problems from occuring
-	"""
-	# https://github.com/isagalaev/ijson/issues/54
-	with open(fname, 'rb') as f:
-		for obj in ijson.items(f,"item"):
-			user = obj["user"]
-			entities_shortened = obj["entitiesShortened"]
-			inputs = []
-			for item in entities_shortened:
-				if item["type"] == "userMention":
-					inputs.append("\1@"+item["value"]+"\1")
-				elif item["type"] == "hashtag":
-					inputs.append("\2#"+item["value"]+"\2")
-				elif item["type"] == "url":
-					inputs.append("\3<link>\3")
-				else:
-					inputs.append(item["value"])
-			entities_full = obj["entitiesFull"]
-			expected_out = []
-			for item in entities_full:
-				if item["type"] == "url":
-					expected_out.append("%s")
-				else:
-					expected_out.append(item["value"])
+        """
+        :param fname - file name
+        This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
+        The generator sanitizes the data to prevent problems from occuring
+        """
+        with open(fname) as f:
+                for obj in ijson.items(f,"item"):
+                        user = obj["user"]
+                        entities_shortened = obj["entitiesShortened"]
+                        inputs = []
+                        for item in entities_shortened:
+                                if item["type"] == "userMention":
+                                        inputs.append("\1@"+item["value"]+"\1")
+                                elif item["type"] == "hashtag":
+                                        inputs.append("\2#"+item["value"]+"\2")
+                                elif item["type"] == "url":
+                                        inputs.append("\3<link>\3")
+                                else:
+                                        inputs.append(item["value"])
+                        entities_full = obj["entitiesFull"]
+                        expected_out = []
+                        for item in entities_full:
+                                if item["type"] == "url":
+                                        expected_out.append("%s")
+                                else:
+                                        expected_out.append(item["value"])
 
-			yield "".join(inputs)," ".join(expected_out)
+                        yield "".join(inputs)," ".join(expected_out)
+
+
+def mix_generators(*args):
+	"""
+	Takes a bunch of generators and returns a generator which samples
+	each generator
+	"""
+	generators = list(args)
+	i = 0
+	while len(generators) > 0:
+		try:
+			yield next(generators[i%len(generators)])
+		except:
+			del generators[i%len(generators)]
+		finally:
+			i+=1
 			
 
 def _input2training_batch(fname, max_len=300):
@@ -129,6 +159,10 @@ def _input2training_batch(fname, max_len=300):
 		for c in outputs:
 			yield curr_buff,c
 			curr_buff = curr_buff + c
+
+
+def strip_prediction(string):
+	return string.split("\5")
 
 
 def char2vec(char_sequence):
@@ -168,7 +202,7 @@ def training_batch_generator(fname, length = 300):
 		yield np.array([char2vec(inputs)]),np.array(char2vec(expectation))
 
 
-def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
+def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20):
 	"""
 	:param jsonpath: path to JSON file
 	:param modelpapth: path to the model
@@ -187,48 +221,49 @@ def test_model_twitter(jsonpath, modelpath, k=3, j=10, window_size=20):
 	"""
 	with open(jsonpath, 'r') as f:
 		model = load_model(modelpath)
-		for tweet_id, string in parse_test_case(f.readline()):
-			# seed string is same length that was used in training
-			top_k = beam_search(load_model(modelpath), string[:window_size], k=int(k), j=int(j), length=140)
-			# for the same user, yield each of the top_k predictions
-			for prediction in top_k:
-				yield {tweet_id : prediction.replace('\1',' ').replace('\2',' ').replace('\3',' ').split()}
+		for tweet_id, seed, letters in parse_test_case(f.readline()):
+			if tweet_id not in tweet_ids:
+				# seed string is same length that was used in training
+				top_k = beam_search(load_model(modelpath), seed, letters, k=int(k), j=int(j))
+				# for the same user, yield each of the top_k predictions
+				for prediction in top_k:
+					prediction = prediction[len(seed)+1:]
+					print(seed, letters, parse_output(prediction))
+					yield {tweet_id : parse_output(prediction)}
 
 
 def parse_output(s):
+	s = s.replace("%s", "")
 	specchars = ['\1', '\2', '\3']
 	for spec in specchars:
 		indeces = [i for i,x in enumerate(s) if x == spec]
 		for i in range(0, len(indeces)-1, 2):
-			s = s[:indeces[i]] + s[indeces[i+1]:]
+			s = s[:indeces[i]] + s[indeces[i+1]+1:]
+	r = re.compile(r'[\s{}]+'.format(re.escape(punctuation + digits + '\1\2\3')))
+	s = [ch.strip(' ') for ch in r.split(s) if ch.strip(' ') != '']
 	return s
+	# return re.sub(r'<link>', b' ', s)
 
 
 if __name__ == "__main__":
 	import character_rnn
 	import sys
-	print("Starting training...")
-	if len(sys.argv) >= 2:
-		count = 0
-		pre = 0
-		for file in sys.argv[1:]:
-			print("loading model weights.",end="")
-			if count == 0:
-				print("{}.hdf5".format(file))
-				character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(file)), generator=training_batch_generator)
-			else:
+	if len(sys.argv) >= 2 and sys.argv[1] == "train":
+		print("Starting {}ing...".format(sys.argv[1]))
+		if len(sys.argv) >= 3:
+			count = 0
+			pre = ""
+			for file in sys.argv[2:]:
+				print("loading model weights.",end="")
+				if count == 0:
+					filenum = str(int(file[-8:-5])-1)
+					pre = file[:-8] + '0'*(3-len(filenum)) + filenum + file[-5:]
+				"""
+					print("{}.hdf5".format(file))
+					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(file)), generator=training_batch_generator)
+				else:
+				"""
 				print("{}.hdf5".format(pre))
 				character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
-			count += 1
-			pre = file
-
-				
-	else:
-		print("Usage: %s [json files]"%sys.argv[0])
-	"""
-	if len(sys.argv) >= 3:
-		for prediction in test_model_twitter(*sys.argv[1:]):
-			print(prediction)
-	else:
-		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
-	"""
+				count += 1
+				pre = file

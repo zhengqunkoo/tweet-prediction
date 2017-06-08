@@ -87,7 +87,7 @@ class ParseJSON(object):
 		yields list of values, where each value corresponds to each dictionary key in keys,
 		yields over all JSON objects in .json file
 		"""
-		with open(self.filepath) as f:
+		with open(self.filepath, 'rb') as f:
 			for json_obj in ijson.items(f, 'item'):
 				# since the file is a list of json objects, each json_obj currently is a dictionary
 				yield [self.get_values(json_obj, keys) for keys in self.all_keys]

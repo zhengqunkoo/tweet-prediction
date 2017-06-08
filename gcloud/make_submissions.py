@@ -33,7 +33,7 @@ def make_submissions(domain, EMAIL, AUTHKEY, id2submissions, results_path, resul
 			dump(contents.json(), f)
 	# log content errors
 	else:
-		errors.append(id2predictions + '\tunable to get contents')
+		errors.append(id2submissions + '\tunable to get contents')
 
 	print_url_message(errors)
 
@@ -50,17 +50,47 @@ def print_url_message(lst):
 if __name__ == '__main__':
 	import sys
 	from metadata_preproc import test_model_twitter
+	import pickle
+	import os
 	# CHANGE THIS TO SUBMISSIONS WHEN READY
-	domain = 'http://challenges.tmlc1.unpossib.ly/api/tests'
+	domain = 'http://challenges.tmlc1.unpossib.ly/api/submissions.'
 	EMAIL = 'zhengqun.koo@gmail.com'
 	AUTHKEY = '69072a84e36a942c33a3ff678b6f23a4'
-
-	id2submissions = {}
-	if len(sys.argv) >= 3: 
-		for prediction in test_model_twitter(*sys.argv[1:]): 
-			id2submissions = {**id2submissions, **prediction}
-	else:
-		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
 	results_path = 'results/'
 	results_file = 'results.txt'
-	make_submissions(domain, EMAIL, AUTHKEY, id2submissions, results_path, results_file)
+
+	file = '{}.pickle'.format(sys.argv[1])
+	print(file)
+	if len(sys.argv) == 2:
+		id2submissions = {}
+		with open(file, 'rb') as f:
+			try:
+				while True:
+					id2submission = pickle.load(f)
+					if id2submission:
+						for tweet_id, submission in id2submission.items():
+							if tweet_id not in id2submissions:
+								id2submissions[tweet_id] = []
+							# asciisubmission = [''.join([ch for ch in word if 0 <= ord(ch) <= 128]) for word in submission]
+							id2submissions[tweet_id].append(submission)
+			except EOFError:
+				pass
+
+		make_submissions(domain, EMAIL, AUTHKEY, id2submissions, results_path, results_file)
+
+	elif len(sys.argv) >= 3:
+		tweet_ids = set()
+		if os.path.isfile(file):
+			with open(file, 'rb') as f:
+				try:
+					while True:
+						tweet_id = list(pickle.load(f).keys())[0]
+						tweet_ids.add(tweet_id)
+				except EOFError:
+					pass
+		with open(file, 'ab') as out:
+			for prediction in test_model_twitter(tweet_ids, *sys.argv[1:]):
+				pickle.dump(prediction, out)
+	else:
+		print("Usage: %s <pathToJson> <pathToModel> [k] [j]"%sys.argv[0])
+	

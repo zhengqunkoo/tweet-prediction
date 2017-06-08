@@ -119,16 +119,20 @@ def get_file_sequence(filename_filetype, start, end):
 		for i in range(start, end + 1):
 			i = str(i)
 			# pad
-			if len(i) == 1:
-				i = '0' + i
+			if len(i) <= 3:
+				i = '0'*(3-len(i)) + i
 			file_sequence.append(filename + i + filetype)
 	return file_sequence
 
 if __name__ == '__main__':
-	domain = 'http://challenges.tmlc1.unpossib.ly/api/datasets/'
-	filename_filetype = {'tmlc1-testing-full-':'.tar.gz'}
-	file_sequence = get_file_sequence(filename_filetype, 1, 9)
-	dirpath = 'downloads/'
-	EMAIL = 'zhengqun.koo@gmail.com'
-	AUTHKEY = '69072a84e36a942c33a3ff678b6f23a4'
-	url_download(domain, file_sequence, dirpath, EMAIL, AUTHKEY)
+	import sys
+	if len(sys.argv) == 3:
+		domain = 'http://challenges.tmlc1.unpossib.ly/api/datasets/'
+		filename_filetype = {'tmlc1-scoring-':'.json'}
+		file_sequence = get_file_sequence(filename_filetype, int(sys.argv[1]),int( sys.argv[2]))
+		dirpath = './'
+		EMAIL = 'zhengqun.koo@gmail.com'
+		AUTHKEY = '69072a84e36a942c33a3ff678b6f23a4'
+		url_download(domain, file_sequence, dirpath, EMAIL, AUTHKEY)
+	else:
+		print("Usage: %s <filestart> <fileend>\n".format(sys.argv[0]))
