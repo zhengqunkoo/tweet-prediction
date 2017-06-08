@@ -142,7 +142,7 @@ def train_model_twitter(file, model=charRNN_model(), generator = build_batch):
     :return: 
     """
     model.fit_generator(generator(file), steps_per_epoch=100, epochs=4000,
-                        callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{}.hdf5".format(file))])
+                        callbacks=[TensorBoard("./log"), ModelCheckpoint("weights.{}.hdf5".format(file), period=20)])
 
 
 if __name__ == "__main__":

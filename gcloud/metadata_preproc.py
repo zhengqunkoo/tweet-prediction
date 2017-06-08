@@ -127,9 +127,12 @@ def parse_input(fname):
 				else:
 					expected_out.append(item["value"])
 			expected_out = " ".join(expected_out)
-			if detect(expected_out) == "en":
-				yield "".join(inputs), expected_out
-			else:
+			try:
+				if detect(expected_out) == "en":
+					yield "".join(inputs), expected_out
+				else:
+					continue
+			except:
 				continue
 
 
@@ -260,16 +263,16 @@ if __name__ == "__main__":
 			for file in sys.argv[2:]:
 				print("loading model weights.",end="")
 				if count == 0:
-					"""
 					# to resume training from previous command
 					filenum = str(int(file[-8:-5])-1)
-					file = file[:-8] + '0'*(3-len(filenum)) + filenum + file[-5:]
-					print("{}.hdf5".format(file))
-					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(file)), generator=training_batch_generator)
+					weights = file[:-8] + '0'*(3-len(filenum)) + filenum + file[-5:]
+					print("{}.hdf5, train on {}".format(weights, file))
+					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(weights)), generator=training_batch_generator)
 					"""
 					# to start new model
 					print("NEW MODEL!")
 					character_rnn.train_model_twitter(file, generator=training_batch_generator)
+					"""
 				else:
 					print("{}.hdf5".format(pre))
 					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
