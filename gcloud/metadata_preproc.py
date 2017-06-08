@@ -9,6 +9,7 @@ from keras.models import load_model
 import re
 from string import punctuation, digits
 from math import log
+from langdetect import detect
 
 def parse_test_case(test_case):
 	"""
@@ -126,8 +127,9 @@ def parse_input(fname):
                                         expected_out.append("%s")
                                 else:
                                         expected_out.append(item["value"])
-
-                        yield "".join(inputs)," ".join(expected_out)
+                        expected_out = " ".join(expected_out)
+                        if detect(expected_out) == "en":
+                        	yield "".join(inputs), expected_out
 
 
 def mix_generators(*args):
