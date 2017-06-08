@@ -101,35 +101,36 @@ def beam_search(model, seed, letters, k=3, j=10):
 	
 
 def parse_input(fname):
-        """
-        :param fname - file name
-        This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
-        The generator sanitizes the data to prevent problems from occuring
-        """
-        with open(fname) as f:
-                for obj in ijson.items(f,"item"):
-                        user = obj["user"]
-                        entities_shortened = obj["entitiesShortened"]
-                        inputs = []
-                        for item in entities_shortened:
-                                if item["type"] == "userMention":
-                                        inputs.append("\1@"+item["value"]+"\1")
-                                elif item["type"] == "hashtag":
-                                        inputs.append("\2#"+item["value"]+"\2")
-                                elif item["type"] == "url":
-                                        inputs.append("\3<link>\3")
-                                else:
-                                        inputs.append(item["value"])
-                        entities_full = obj["entitiesFull"]
-                        expected_out = []
-                        for item in entities_full:
-                                if item["type"] == "url":
-                                        expected_out.append("%s")
-                                else:
-                                        expected_out.append(item["value"])
-                        expected_out = " ".join(expected_out)
-                        if detect(expected_out) == "en":
-                        	yield "".join(inputs), expected_out
+	"""
+	:param fname - file name
+	This generator takes an input and parses it splitting it into tuples of (inputs, outputs)
+	The generator sanitizes the data to prevent problems from occuring
+	"""
+	with open(fname, 'rb') as f:
+		for obj in ijson.items(f,"item"):
+			entities_shortened = obj["entitiesShortened"]
+			inputs = []
+			for item in entities_shortened:
+				if item["type"] == "userMention":
+					inputs.append("\1@"+item["value"]+"\1")
+				elif item["type"] == "hashtag":
+					inputs.append("\2#"+item["value"]+"\2")
+				elif item["type"] == "url":
+					inputs.append("\3<link>\3")
+				else:
+					inputs.append(item["value"])
+			entities_full = obj["entitiesFull"]
+			expected_out = []
+			for item in entities_full:
+				if item["type"] == "url":
+					expected_out.append("%s")
+				else:
+					expected_out.append(item["value"])
+			expected_out = " ".join(expected_out)
+			if detect(expected_out) == "en":
+				yield "".join(inputs), expected_out
+			else:
+				continue
 
 
 def mix_generators(*args):
@@ -230,7 +231,8 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 				# for the same user, yield each of the top_k predictions
 				for prediction in top_k:
 					prediction = prediction[len(seed)+1:]
-					print(seed, letters, parse_output(prediction))
+					# UNCOMMENT TO PRINT PREDICTIONS
+					# print(seed, letters, parse_output(prediction))
 					yield {tweet_id : parse_output(prediction)}
 
 
@@ -258,14 +260,18 @@ if __name__ == "__main__":
 			for file in sys.argv[2:]:
 				print("loading model weights.",end="")
 				if count == 0:
+					"""
+					# to resume training from previous command
 					filenum = str(int(file[-8:-5])-1)
-					pre = file[:-8] + '0'*(3-len(filenum)) + filenum + file[-5:]
-				"""
+					file = file[:-8] + '0'*(3-len(filenum)) + filenum + file[-5:]
 					print("{}.hdf5".format(file))
 					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(file)), generator=training_batch_generator)
+					"""
+					# to start new model
+					print("NEW MODEL!")
+					character_rnn.train_model_twitter(file, generator=training_batch_generator)
 				else:
-				"""
-				print("{}.hdf5".format(pre))
-				character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
+					print("{}.hdf5".format(pre))
+					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
 				count += 1
 				pre = file
