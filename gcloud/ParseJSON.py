@@ -1,4 +1,7 @@
-import ijson.backends.yajl2_cffi as ijson
+try:
+        import ijson.backends.yajl2_cffi as ijson
+except:
+        import ijson
 from pprint import pprint
 import re
 import os

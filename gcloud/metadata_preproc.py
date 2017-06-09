@@ -3,7 +3,7 @@ Defines functions to handle metadata
 """
 try:
         import ijson.backends.yajl2_cffi as ijson
-except ImportError:
+except:
         import ijson
 import numpy as np
 import json
@@ -230,7 +230,7 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 	"""
 	with open(jsonpath, 'r') as f:
 		model = load_model(modelpath)
-		for tweet_id, seed, letters in parse_test_case(f.readline()):
+		for tweet_id, seed, letters in parse_test_case(f.read()):
 			if tweet_id not in tweet_ids:
 				# seed string is same length that was used in training
 				top_k = beam_search(load_model(modelpath), seed, letters, k=int(k), j=int(j))
@@ -282,5 +282,5 @@ if __name__ == "__main__":
 				count += 1
 				pre = file
 	elif len(sys.argv) >= 2 and sys.argv[1] == "eval":
-                for pred in test_model_twitter([],sys.argv[2],sys.argv[3]):
-                        print(pred)
+		for pred in test_model_twitter([],sys.argv[2],sys.argv[3]):
+			print(pred)
