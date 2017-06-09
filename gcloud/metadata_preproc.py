@@ -1,7 +1,10 @@
 """
 Defines functions to handle metadata
 """
-import ijson.backends.yajl2_cffi as ijson
+try:
+        import ijson.backends.yajl2_cffi as ijson
+except ImportError:
+        import ijson
 import numpy as np
 import json
 import os
@@ -56,7 +59,6 @@ def get_k_highest_probabilities(probabilities, k=5):
 		probabilities[0][ord(letter)] = 0
 	return max_probs
 
-
 def beam_search(model, seed, letters, k=3, j=10):
 	"""
 	:param model: the model
@@ -81,16 +83,14 @@ def beam_search(model, seed, letters, k=3, j=10):
 	for _ in range(k):
 		top_k[seed] = [0, 0]
 	while True:
+		finished_count = 0
 		for seed, value in top_k.items():
 			c_prob, letter_ind = value
 			new_top_k = {}
-			if seed[-1] == " ":
-				try:
-					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
-				except IndexError:
-					# finished predicting last word, return
-					# remove extra space at end of prediction
-					return [prediction.strip(' ') for prediction in list(top_k.keys())]
+			if seed[-1] == " " and letter_ind <= len(letters):
+				new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
+			elif letter_ind >= len(letters):
+				finished_count += 1
 			else:
 				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 				for letter, prob in max_probs.items():
@@ -98,6 +98,9 @@ def beam_search(model, seed, letters, k=3, j=10):
 					new_top_k[seed + letter] = [c_prob + log(prob), letter_ind]
 			# from j candidates, keep top k probabilities
 			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])
+		# Reached last letter of word.
+		if finished_count == k:
+			return [prediction.strip(' ') for prediction in list(top_k.keys())]
 	
 
 def parse_input(fname):
