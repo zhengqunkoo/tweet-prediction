@@ -88,9 +88,9 @@ def beam_search(model, seed, letters, k=3, j=10):
 	for _ in range(k):
 		top_k[seed] = [1, 0]
 	while True:
+		new_top_k = {}
 		for seed, value in top_k.items():
 			c_prob, letter_ind = value
-			new_top_k = {}
 			if seed[-1] == " ":
 				try:
 					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
@@ -104,7 +104,7 @@ def beam_search(model, seed, letters, k=3, j=10):
 					# use logarithmic probs
 					new_top_k[seed + letter] = [c_prob * prob, letter_ind]
 			# from j candidates, keep top k probabilities
-			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])	
+		top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])	
 
 def parse_input(fname):
 	"""
