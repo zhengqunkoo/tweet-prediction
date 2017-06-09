@@ -1,7 +1,10 @@
 """
 Defines functions to handle metadata
 """
-import ijson.backends.yajl2_cffi as ijson
+try:
+        import ijson.backends.yajl2_cffi as ijson
+except ImportError:
+        import ijson
 import numpy as np
 import json
 import os
@@ -56,7 +59,6 @@ def get_k_highest_probabilities(probabilities, k=5):
 		probabilities[0][ord(letter)] = 0
 	return max_probs
 
-
 def beam_search(model, seed, letters, k=3, j=10):
 	"""
 	:param model: the model
@@ -79,25 +81,27 @@ def beam_search(model, seed, letters, k=3, j=10):
 	# strip ' ' from seed so don't skip first word
 	seed = seed.strip(' ')
 	for _ in range(k):
-		top_k[seed] = [0, 0]
+		top_k[seed] = [1, 0]
 	while True:
+		finished_count = 0
 		for seed, value in top_k.items():
 			c_prob, letter_ind = value
 			new_top_k = {}
-			if seed[-1] == " ":
-				try:
-					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
-				except IndexError:
-					# finished predicting last word, return
-					# remove extra space at end of prediction
-					return [prediction.strip(' ') for prediction in list(top_k.keys())]
+			if seed[-1] == " " and letter_ind <= len(letters):
+				new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
+			elif letter_ind >= len(letters):
+				# ensure new_top_k not empty
+				new_top_k[seed] = value
+				finished_count += 1
 			else:
 				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 				for letter, prob in max_probs.items():
-					# use logarithmic probs
-					new_top_k[seed + letter] = [c_prob + log(prob), letter_ind]
+					new_top_k[seed + letter] = [c_prob * prob, letter_ind]
 			# from j candidates, keep top k probabilities
 			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])
+		# Reached last letter of word.
+		if finished_count == k:
+			return [prediction.strip(' ') for prediction in list(top_k.keys())]
 	
 
 def parse_input(fname):
@@ -233,23 +237,34 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 				top_k = beam_search(load_model(modelpath), seed, letters, k=int(k), j=int(j))
 				# for the same user, yield each of the top_k predictions
 				for prediction in top_k:
-					prediction = prediction[len(seed)+1:]
 					# UNCOMMENT TO PRINT PREDICTIONS
-					# print(seed, letters, parse_output(prediction))
+					print(seed, letters, parse_output(prediction))
+					prediction = prediction[len(seed)+1:]
 					yield {tweet_id : parse_output(prediction)}
 
 
 def parse_output(s):
 	s = s.replace("%s", "")
 	specchars = ['\1', '\2', '\3']
+	# remove text between special characters
 	for spec in specchars:
 		indeces = [i for i,x in enumerate(s) if x == spec]
 		for i in range(0, len(indeces)-1, 2):
 			s = s[:indeces[i]] + s[indeces[i+1]+1:]
-	r = re.compile(r'[\s{}]+'.format(re.escape(punctuation + digits + '\1\2\3')))
-	s = [ch.strip(' ') for ch in r.split(s) if ch.strip(' ') != '']
-	return s
-	# return re.sub(r'<link>', b' ', s)
+	# only keep letters if they are ascii_letters
+	# split along non-letters
+	letters_only = []
+	word = ''
+	for ch in s:
+		if ch in ascii_letters:
+			word += ch
+		else:
+			# append nonempty words and non-spaces
+			if word != '' and word != ' ':
+				letters_only.append(word)
+			word = ''
+	# add last word
+	return letters_only + [word]
 
 
 if __name__ == "__main__":
