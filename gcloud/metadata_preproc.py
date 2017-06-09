@@ -220,13 +220,6 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 	:param window_size: ideally, same number used in training model, default 20.
 
 	yields dictionary of format {<tweet_id>:[<space-separated sentence>]}
-	outputs (not much variance, maybe increase j?):
-	{'rens0erfsao': ['500p/P"LC2"bJC-\x03<ling', '.onithic', 'pooitioear', '.onol', 'anterestinetingsurotero', 'a', 'chelugivetes', '.ade', 'cating', 'tere', 'tho', 'peritesiogs', 'a', 'forme', 'capintietsion']}
-	{'rens0erfsao': ['500p/P"LC2"bJC-\x03<ling', '.onithic', 'pooitioear', '.onol', 'anterestinetingsurotero', 'a', 'chelugivetes', '.ade', 'cating', 'tere', 'tho', 'peritesiogs', 'a', 'forme', 'capintietsiou']}
-	{'rens0erfsao': ['500p/P"LC2"bJC-\x03<ling', '.onithic', 'pooitioear', '.onol', 'anterestinetingsurotero', 'a', 'chelugivetes', '.ade', 'cating', 'tere', 'tho', 'peritesiogs', 'a', 'forme', 'capintietsiom']}
-	{'revfvdonwg0': ['R\x01@Eman36\x01:\x01@mikezigg', 'and', 'the', 'readersioua', 'ofrate', 'yations', 'tho', 'corsemitere', '.ereath', 'yat', 'ofedesteris', '.egentiog', 'ano', 'peater', 'teede', 'yourrcanl', 'teed', 'th']}
-	{'revfvdonwg0': ['R\x01@Eman36\x01:\x01@mikezigg', 'and', 'the', 'readersioua', 'ofrate', 'yations', 'tho', 'corsemitere', '.ereath', 'yat', 'ofedesteris', '.egentiog', 'ano', 'peater', 'teede', 'yourrcanl', 'teed', 'to']}
-	{'revfvdonwg0': ['R\x01@Eman36\x01:\x01@mikezigg', 'and', 'the', 'readersioua', 'ofrate', 'yations', 'tho', 'corsemitere', '.ereath', 'yat', 'ofedesteris', '.egentiog', 'ano', 'peater', 'teede', 'yourrcanl', 'teed', 'te']}
 	"""
 	with open(jsonpath, 'r') as f:
 		model = load_model(modelpath)
@@ -236,9 +229,9 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 				top_k = beam_search(load_model(modelpath), seed, letters, k=int(k), j=int(j))
 				# for the same user, yield each of the top_k predictions
 				for prediction in top_k:
+					prediction = prediction[len(seed)+1:]
 					# UNCOMMENT TO PRINT PREDICTIONS
 					print(seed, letters, parse_output(prediction))
-					prediction = prediction[len(seed)+1:]
 					yield {tweet_id : parse_output(prediction)}
 
 
@@ -263,7 +256,9 @@ def parse_output(s):
 				letters_only.append(word)
 			word = ''
 	# add last word
-	return letters_only + [word]
+	if word != '' and word != ' ':
+		letters_only.append(word)
+	return letters_only
 
 
 if __name__ == "__main__":
