@@ -56,7 +56,7 @@ if __name__ == '__main__':
 	import pickle
 	import os
 	# CHANGE THIS TO SUBMISSIONS WHEN READY
-	domain = 'http://challenges.tmlc1.unpossib.ly/api/submissions.'
+	domain = 'http://challenges.tmlc1.unpossib.ly/api/submissions'
 	EMAIL = 'zhengqun.koo@gmail.com'
 	AUTHKEY = '69072a84e36a942c33a3ff678b6f23a4'
 	results_path = 'results/'
