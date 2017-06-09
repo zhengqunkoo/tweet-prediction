@@ -96,8 +96,8 @@ def beam_search(model, seed, letters, k=3, j=10):
 					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
 				except IndexError:
 					# finished predicting last word, return
-					# remove extra space at end of prediction
-					return [prediction.strip(' ') for prediction in list(top_k.keys())]
+					# only return top 3 predictions, regardless of k
+					return [prediction for prediction in list(top_k.keys())[:3]]
 			else:
 				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 				for letter, prob in max_probs.items():
@@ -229,7 +229,7 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 				# for the same user, yield each of the top_k predictions
 				for prediction in top_k:
 					# UNCOMMENT TO PRINT PREDICTIONS
-					print(seed, letters, top_k)
+					print(seed, letters, parse_output(prediction))
 					yield {tweet_id : parse_output(prediction)}
 
 

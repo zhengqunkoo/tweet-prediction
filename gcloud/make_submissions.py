@@ -62,36 +62,37 @@ if __name__ == '__main__':
 	results_path = 'results/'
 	results_file = 'results.txt'
 
-	file = '{}.pickle'.format(sys.argv[1])
-	print(file)
-	if len(sys.argv) == 2:
+	if sys.argv[1] == 'submit' and len(sys.argv) == 3:
 		id2submissions = {}
-		with open(file, 'rb') as f:
-			try:
-				while True:
-					id2submission = pickle.load(f)
-					if id2submission:
-						for tweet_id, submission in id2submission.items():
-							if tweet_id not in id2submissions:
-								id2submissions[tweet_id] = []
-							asciisubmission = [''.join([ch for ch in word if 0 <= ord(ch) <= 128]) for word in submission]
-							id2submissions[tweet_id].append(asciisubmission)
-			except EOFError:
-				pass
+		for file in sys.argv[2:]:
+			print(file)
+			with open(file, 'rb') as f:
+				try:
+					while True:
+						id2submission = pickle.load(f)
+						if id2submission:
+							for tweet_id, submission in id2submission.items():
+								if tweet_id not in id2submissions:
+									id2submissions[tweet_id] = []
+								id2submissions[tweet_id].append(submission)
+				except EOFError:
+					pass
 
 		make_submissions(domain, EMAIL, AUTHKEY, id2submissions, results_path, results_file)
 
-	elif len(sys.argv) == 3:
+	elif sys.argv[1] == 'split' and len(sys.argv) == 4:
 		# split json into n files
 		# don't handle deleting old split json files
 		# because we only pass the newest split json files into test_model twitter
-		print("splitting {} into {}".format(sys.argv[1], sys.argv[2]))
-		pj = ParseJSON(sys.argv[1], [], {})
-		pj.split_json(sys.argv[2])
+		print("splitting {} into {}".format(sys.argv[2], sys.argv[3]))
+		pj = ParseJSON(sys.argv[2], [], {})
+		pj.split_json(sys.argv[3])
 
-	elif len(sys.argv) >= 4:
+	elif sys.argv[1] == 'test' and len(sys.argv) >= 5:
 		# if pickle exists, read tweet ids into set, so don't duplicate tweets
 		print(sys.argv)
+		file = '{}.pickle'.format(sys.argv[2])
+		print(file)
 		tweet_ids = set()
 		if os.path.isfile(file):
 			with open(file, 'rb') as f:
@@ -103,8 +104,8 @@ if __name__ == '__main__':
 					pass
 		# append to pickle
 		with open(file, 'ab') as out:
-			for prediction in test_model_twitter(tweet_ids, *sys.argv[1:]):
+			for prediction in test_model_twitter(tweet_ids, *sys.argv[2:]):
 				pickle.dump(prediction, out)
 	else:
-		print("Usage: %s <pathToJson>\nOR\n%s <pathToJson> <n>\nOR\n%s <pathToJson> <pathToModel> <k> <j>" % (sys.argv[0], sys.argv[0], sys.argv[0]))
+		print("Usage: %s submit <pathToJson>\nOR\n%s split <pathToJson> <n>\nOR\n%s test <pathToJson> <pathToModel> <k> <j>" % (sys.argv[0], sys.argv[0], sys.argv[0]))
 	
