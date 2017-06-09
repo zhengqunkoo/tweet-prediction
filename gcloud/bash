@@ -1,0 +1,6 @@
+#!/bin/bash
+
+outfile=nohup.out
+jsondir=split/
+jsonfile=tmlc1-scoring-005.json
+for((i=0;i<10;i++)); do eval 'nohup python3 make_submissions.py $jsondir$i$jsonfile weights.tmlc1-testing-full-003.json.hdf5 2 2 &> $jsondir$i$outfile &' & done

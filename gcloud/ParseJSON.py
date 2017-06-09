@@ -1,8 +1,11 @@
 import ijson.backends.yajl2_cffi as ijson
 from pprint import pprint
 import re
+import os
+from json import dumps
 
 class ParseJSON(object):
+
 	def __init__(self, filepath, all_keys, replace_types):
 		"""
 		:param filepath: .json filepath, where the file is formatted as a list of JSON objects
@@ -16,6 +19,7 @@ class ParseJSON(object):
 		self.filepath = filepath
 		self.all_keys = all_keys
 		self.replace_types = replace_types
+
 
 	def get_values(self, json_obj, keys):
 		"""
@@ -82,6 +86,7 @@ class ParseJSON(object):
 		# if json_obj was never a list, then json_obj is now the desired value. return this value
 		return json_obj
 
+
 	def parse_json(self):
 		"""
 		yields list of values, where each value corresponds to each dictionary key in keys,
@@ -91,6 +96,7 @@ class ParseJSON(object):
 			for json_obj in ijson.items(f, 'item'):
 				# since the file is a list of json objects, each json_obj currently is a dictionary
 				yield [self.get_values(json_obj, keys) for keys in self.all_keys]
+
 
 	def filter_keyvaluepair_by_key(self, key):
 		"""
@@ -103,6 +109,34 @@ class ParseJSON(object):
 			keyvaluepair_samekey = filter(lambda x : x[0] == key, zip(*result))
 			value_samekey = map(lambda x : x[1], keyvaluepair_samekey)
 			yield list(value_samekey)
+
+
+	def split_json(self, n):
+		"""
+		splits a json file into files with at most n lines each
+		returns list of json filenames with at most n lines each (naming conflicts resolved by prepending filecount number)
+		"""
+		n = int(n)
+		if not os.path.exists('split'):
+			os.makedirs('split')
+		with open(self.filepath, 'rb') as f:
+			count = 0
+			filecount = 0
+			fullpath = 'split/' + str(filecount) + self.filepath
+			print(fullpath)
+			n_json_obj = []
+			for json_obj in ijson.items(f, 'item'):
+				count += 1
+				n_json_obj.append(json_obj)
+				if count == n:
+					filecount += 1
+					print(fullpath)
+					count = 0
+					with open(fullpath, 'a') as dumpf:
+						dumpf.write(dumps(n_json_obj))
+					n_json_obj = []
+					fullpath = 'split/' + str(filecount) + self.filepath
+			
 
 if __name__ == '__main__':
 	# example 1
