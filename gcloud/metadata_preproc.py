@@ -35,7 +35,12 @@ def parse_test_case(test_case):
 			else:
 				inputs.append(item["value"])
 				letters.append(item["value"])
-		yield obj["id"], "".join(inputs), "".join(letters)
+		yield obj["id"], "".join(inputs)+"\4"+letters[0], "".join(letters[1:])
+
+
+def strip_prediction(string):
+        return string.split("\4")[1]
+
 
 def get_probabilities(model, string):
 	"""
@@ -57,6 +62,7 @@ def get_k_highest_probabilities(probabilities, k=5):
 		max_probs[letter] = probabilities[0][ord(letter)]
 		probabilities[0][ord(letter)] = 0
 	return max_probs
+
 
 def beam_search(model, seed, letters, k=3, j=10):
 	"""
@@ -82,26 +88,23 @@ def beam_search(model, seed, letters, k=3, j=10):
 	for _ in range(k):
 		top_k[seed] = [1, 0]
 	while True:
-		finished_count = 0
 		for seed, value in top_k.items():
 			c_prob, letter_ind = value
 			new_top_k = {}
-			if seed[-1] == " " and letter_ind <= len(letters):
-				new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
-			elif letter_ind >= len(letters):
-				# ensure new_top_k not empty
-				new_top_k[seed] = value
-				finished_count += 1
+			if seed[-1] == " ":
+				try:
+					new_top_k[seed + letters[letter_ind]] = [c_prob, letter_ind+1]
+				except IndexError:
+					# finished predicting last word, return
+					# remove extra space at end of prediction
+					return [prediction.strip(' ') for prediction in list(top_k.keys())]
 			else:
 				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 				for letter, prob in max_probs.items():
+					# use logarithmic probs
 					new_top_k[seed + letter] = [c_prob * prob, letter_ind]
 			# from j candidates, keep top k probabilities
-			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])
-		# Reached last letter of word.
-		if finished_count == k:
-			return [prediction.strip(' ') for prediction in list(top_k.keys())]
-	
+			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])	
 
 def parse_input(fname):
 	"""
@@ -170,10 +173,6 @@ def _input2training_batch(fname, max_len=300):
 			curr_buff = curr_buff + c
 
 
-def strip_prediction(string):
-	return string.split("\5")
-
-
 def char2vec(char_sequence):
 	"""
 	:param char_sequence - a sequence of characters
@@ -229,13 +228,14 @@ def test_model_twitter(tweet_ids, jsonpath, modelpath, k=3, j=10, window_size=20
 				top_k = beam_search(load_model(modelpath), seed, letters, k=int(k), j=int(j))
 				# for the same user, yield each of the top_k predictions
 				for prediction in top_k:
-					prediction = prediction[len(seed)+1:]
 					# UNCOMMENT TO PRINT PREDICTIONS
-					print(seed, letters, parse_output(prediction))
+					print(seed, letters, top_k)
 					yield {tweet_id : parse_output(prediction)}
 
 
 def parse_output(s):
+	# strip prediction
+	s = strip_prediction(s)
 	s = s.replace("%s", "")
 	specchars = ['\1', '\2', '\3']
 	# remove text between special characters
