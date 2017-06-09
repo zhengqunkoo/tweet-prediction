@@ -10,8 +10,7 @@ import json
 import os
 from keras.models import load_model
 import re
-from string import punctuation, digits
-from math import log
+from string import ascii_letters
 from langdetect import detect
 
 def parse_test_case(test_case):
