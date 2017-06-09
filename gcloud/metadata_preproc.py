@@ -95,7 +95,7 @@ def beam_search(model, seed, letters, k=3, j=10):
 				max_probs = get_k_highest_probabilities(get_probabilities(model, seed), j)
 				for letter, prob in max_probs.items():
 					# use logarithmic probs
-					new_top_k[seed + letter] = [c_prob + log(prob), letter_ind]
+					new_top_k[seed + letter] = [c_prob*prob, letter_ind]
 			# from j candidates, keep top k probabilities
 			top_k = dict(sorted(new_top_k.items(), key=lambda x : x[1][0], reverse=True)[:k])
 		# Reached last letter of word.
