@@ -281,3 +281,6 @@ if __name__ == "__main__":
 					character_rnn.train_model_twitter(file, model=load_model("weights.{}.hdf5".format(pre)), generator=training_batch_generator)
 				count += 1
 				pre = file
+	elif len(sys.argv) >= 2 and sys.argv[1] == "eval":
+                for pred in test_model_twitter([],sys.argv[2],sys.argv[3]):
+                        print(pred)
